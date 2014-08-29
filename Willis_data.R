@@ -1,37 +1,37 @@
+#rm(list=ls())- izbrise vse podatke
 ##Podatki Williso skodnih dogodkih 
 #data_full vsebuje 1516 podatkov o izgubah :  dim(data_full)
 #podatki so od leta 1970 do leta 2014 
 
-setwd('/Users/zala/Documents/Magisterska/')
+setwd('/Users/zala/GitHub/EVA/')
 
-data_full <- read.csv('loss_data_full_view.csv', sep = ';', header = TRUE,fill = TRUE )
+data_full <- read.csv('loss_data_full_view_popr.csv', sep = ';', header = TRUE,fill = TRUE )
 
 summary(data_full[,2:10])
 
-data_1984 <-data_order[data_full$Event.Date>1984,]    #podatki o izgubah od leta 1984 dalje
+data_1984 <-data_full[data_full$Event.Date>1984,]    #podatki o izgubah od leta 1984 dalje
+summary(data_1984[,2:10])
 
-#dim(data_full[data_full$Event.Date>1984,]) :  1449   16 
+#dim(data_1984) :  1449   16 
 
-#odstranjeni podatki, ki loss=NA
+#odstranjeni podatki, kjer loss=NA
 ref <- data_1984$Ref
+org <- data_1984$Organisation
 years <- data_1984$Event.Date
 gross.loss <- data_1984$Gross.Loss.GBP
 
-year_loss <- data.frame(ref, years, gross.loss)
+year_loss_1984 <- data.frame(ref, org, years, gross.loss)
 
-year_loss <- year_loss[order(years, decreasing = TRUE),]
+year_loss_1984 <-na.omit(year_loss_1984) 
 
-year_loss_1984 <-na.omit(year_loss)        
-
-summary(year_loss_1984)
-dim(year_loss_1984)
+#dim(year_loss_1984)
 
 #INDEKS INFLACIJE - popravljene izgube za indeks inflacije
 
 index <- read.csv('CPI_index_yearly.csv', sep = ',', header = TRUE) #inflation indexes 1700-2013
 
-index_2014_monthly <- read.csv('CPI_index_monthly.csv', sep = ',', header = TRUE)[1014:1020,] 
-                                                            #mesecni indeksi inflacije jan-jul 2014
+index_2014_monthly <- read.csv('CPI_index_monthly.csv', 
+                               sep = ',', header = TRUE)[1014:1020,] #mesecni indeksi inflacije jan-jul 2014
 
 index_2014 <- mean(as.numeric(as.vector(index_2014_monthly$CDKO))) #povprecje mesecnih indeksonv 2014
 
@@ -51,6 +51,7 @@ loss_corrected <- data.frame(data_index, loss_corr = corrected)   #dodan stolpec
 
 (loss_corrected[order(loss_corrected$loss_corr, decreasing = TRUE),][1:10,])
 summary(loss_corrected)
+#dim(loss_corrected)
 
 #####
 #EVENT TYPES EXPLAINED : http://www.bis.org/bcbs/qis/oprdata.pdf
@@ -71,7 +72,14 @@ ET_all <- merge(data.frame(ET_sub=ET_sub[-1], ET.index = (ET_main)), ET_short,
 ######
 # potrebni podatki
 #####
-BL <- data_1984$Business.Line
+BL <- as.character(data_1984$Business.Line)
+
+#Op.: Za vse BL, ki imajo vrednost n/a, se nastavi vrednost Unallocated Business Line
+BL[BL=='n/a'] <- 'Unallocated Business Line'
+
+#Op.: Za BL Insurance(life) in Insurance (non-life) se nastavi skupni BL Insurance
+BL[BL=='Insurance(life)'] <- 'Insurance'
+BL[BL=='Insurance (non-life)'] <- 'Insurance'
 
 loss <- merge (loss_corrected,
                data.frame(ref, basel_event = data_1984$Basel.Loss.Event, BL = BL ))
@@ -81,15 +89,16 @@ data <- merge (loss,
                by.x = 'basel_event',
                by.y = 'ET_sub')
 
-data[order(data$loss_corr, decreasing = TRUE),][1:10,]
+data[order(data$loss_corr, decreasing = TRUE),][1:15,c(4,3,7,8,9,10)]
 summary(data)
 
 ####
 #Basel matrika
 ####
-BL <- unique(na.omit(BL))
+BL_unique <- unique(data$BL)
+ET_unique <- unique(data$ET)
 
-grid <- expand.grid(BL=BL, ET=ET) # *all* variable combinations GROUP - YEAR
+grid <- expand.grid(BL=BL_unique, ET=ET_unique) # *all* variable combinations GROUP - YEAR
 
 lvls <- apply(grid, 1, paste, collapse=" ") # naredi vektor stringov vseh kombinacij GROUP-YEAR
 
