@@ -10,7 +10,6 @@ data_full <- read.csv('loss_data_full_view_popr.csv', sep = ';', header = TRUE,f
 summary(data_full[,2:10])
 
 data_1984 <-data_full[data_full$Event.Date>1984,]    #podatki o izgubah od leta 1984 dalje
-summary(data_1984[,2:10])
 
 #dim(data_1984) :  1449   16 
 
@@ -89,17 +88,25 @@ data <- merge (loss,
                by.x = 'basel_event',
                by.y = 'ET_sub')
 
-data[order(data$loss_corr, decreasing = TRUE),][1:15,c(4,3,7,8,9,10)]
 summary(data)
 
 ####
-#Basel matrika
+#Stevilo dogodkov za Basel matriko
 ####
-BL_unique <- unique(data$BL)
-ET_unique <- unique(data$ET)
+BL_unique <- unique(sort(data$BL))
+ET_unique <- unique(sort(data$ET))
 
-grid <- expand.grid(BL=BL_unique, ET=ET_unique) # *all* variable combinations GROUP - YEAR
+BL_ET <- expand.grid(BL=BL_unique, ET=ET_unique) # vse kombinacije BL-ET
 
-lvls <- apply(grid, 1, paste, collapse=" ") # naredi vektor stringov vseh kombinacij GROUP-YEAR
+lev <- apply(BL_ET, 1, paste, collapse=" ")     # vsi leveli - stringi vseh kombinacij BL-ET
 
-nm <- sapply(split(data$loss_corr, factor(paste(data$ET, x$BL), levels=lvls)), length)
+number <- sapply(split(data$loss_corr, factor(paste(data$BL, data$ET), levels=lev)), length)
+
+###
+#Basel matrika
+###
+Basel <- matrix(number,ncol = length(ET_unique), nrow=length(BL_unique) )
+colnames(Basel) <- as.character(ET_unique)
+rownames(Basel) <- as.character(BL_unique)
+
+Basel_vector <- rowSums(Basel)
