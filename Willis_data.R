@@ -129,7 +129,7 @@ plot(years, number_events_year,
 mtext(2, text='Stevilo skodnih dogodkov z znano bruto izgubo', line=3)
 
 #Bruto izgube
-par(new=T)
+par(new=TRUE)
 plot(years, gross_losses_year,
      ylim = c(0, max(gross_losses_year)), xlim = c(1984,2014), axes = F, 
      xlab = '', ylab='',
@@ -141,5 +141,38 @@ mtext(4, text='Skupa znana bruto izguba v mio GBP',line = 3)
 legend(x = 'topleft',legend = c('Stevilo skodnih dogodkov','Bruto izgube v mio GBP'), 
        lty = c(3,2), border = F)
 
+###
+#Graf stevilo izgub skozi leta po BL
+###
 
+BL_years <- expand.grid(BL=BL_unique, years) # vse kombinacije BL-years
+
+level_BL_years <- apply(BL_years, 1, paste, collapse=" ")     # vsi leveli - stringi vseh kombinacij BL-ET
+
+number_BL_years <- sapply(split(data$loss_corr, factor(paste(data$BL, data$years), 
+                                                       levels=level_BL_years)), length)
+
+BL_years_M <- matrix(number_BL_years,ncol = length(years), nrow=length(BL_unique) )
+
+for (bl in 1: length(BL)){
+  
+  if (bl==1){
+    par(mar=c(5, 5, 4, 5) + 0.1)
+    plot(years, BL_years_M[1,] , 
+         ylim = c(0, max(BL_years_M)), xlim = c(1984,2014), 
+         xlab = '', ylab='',
+         type = "l", lty = 1, main = '', col = 1)    
+  }
+  
+  else{
+    par(new=T)
+    plot(years, BL_years_M[bl,], 
+         ylim = c(0, max(BL_years_M)), xlim = c(1984,2014), axes = F,
+         xlab = '', ylab='',
+         type = "l", lty = 1, main = '', col = bl)  
+  }
+}
+
+BL_short <-c("AS","AM", "CB", "CF", "I", "PS", "RBa", "PBr", "TS", "UBL") 
+legend(x = "topleft",legend = BL_short, col= 1: length(BL_short), lty=1 )
 
