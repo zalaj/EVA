@@ -103,10 +103,43 @@ lev <- apply(BL_ET, 1, paste, collapse=" ")     # vsi leveli - stringi vseh komb
 number <- sapply(split(data$loss_corr, factor(paste(data$BL, data$ET), levels=lev)), length)
 
 ###
-#Basel matrika
+#Basel matrika, basel vector
 ###
-Basel <- matrix(number,ncol = length(ET_unique), nrow=length(BL_unique) )
-colnames(Basel) <- as.character(ET_unique)
-rownames(Basel) <- as.character(BL_unique)
+Basel_matrika <- matrix(number,ncol = length(ET_unique), nrow=length(BL_unique) )
+colnames(Basel_matrika) <- as.character(ET_unique)
+rownames(Basel_matrika) <- as.character(BL_unique)
 
-Basel_vector <- rowSums(Basel)
+Basel_vector <- rowSums(Basel_matrika)
+
+###
+#st. skodnih dogodkov
+###
+years <- 1984:2014
+number_events_year <- sapply(split(data$loss_corr, factor(paste(data$years), levels=years)), length)
+gross_losses_year <- sapply(split(data$loss_corr/10^6, factor(paste(data$years), levels=years)), sum)
+
+#Stevilo izgub
+par(mar=c(5, 5, 4, 5) + 0.1)
+plot(years, number_events_year, 
+     ylim = c(0, max(number_events_year)), xlim = c(1984,2014), 
+     xlab = '', ylab='',
+     type = "l", lty = 1, main = '')
+
+#axis(2, ylim = c(0, max(number_events_year)), lwd = 2, col=1) 
+mtext(2, text='Stevilo skodnih dogodkov z znano bruto izgubo', line=3)
+
+#Bruto izgube
+par(new=T)
+plot(years, gross_losses_year,
+     ylim = c(0, max(gross_losses_year)), xlim = c(1984,2014), axes = F, 
+     xlab = '', ylab='',
+     type = "l", lty = 2, lwd = 2, main = '')
+
+axis(4, ylim = c(0, max(gross_losses_year) ), lwd = 1, col=1) 
+mtext(4, text='Skupa znana bruto izguba v mio GBP',line = 3)
+
+legend(x = 'topleft',legend = c('Stevilo skodnih dogodkov','Bruto izgube v mio GBP'), 
+       lty = c(3,2), border = F)
+
+
+
