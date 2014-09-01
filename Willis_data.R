@@ -19,9 +19,12 @@ org <- data_1984$Organisation
 years <- data_1984$Event.Date
 gross.loss <- data_1984$Gross.Loss.GBP
 
-year_loss_1984 <- data.frame(ref, org, years, gross.loss)
+year_loss_1984 <- data.frame(ref, org, years, gross.loss)   
 
 year_loss_1984 <-na.omit(year_loss_1984) 
+
+#odstranjeni se podatki, kjer loss==o, saj nimajo smisla
+year_loss_1984 <- year_loss_1984[!year_loss_1984$gross.loss==0,]
 
 #dim(year_loss_1984)
 
@@ -100,12 +103,12 @@ BL_ET <- expand.grid(BL=BL_unique, ET=ET_unique) # vse kombinacije BL-ET
 
 lev <- apply(BL_ET, 1, paste, collapse=" ")     # vsi leveli - stringi vseh kombinacij BL-ET
 
-number <- sapply(split(data$loss_corr, factor(paste(data$BL, data$ET), levels=lev)), length)
+number_BL_ET <- sapply(split(data$loss_corr, factor(paste(data$BL, data$ET), levels=lev)), length)
 
 ###
 #Basel matrika, basel vector
 ###
-Basel_matrika <- matrix(number,ncol = length(ET_unique), nrow=length(BL_unique) )
+Basel_matrika <- matrix(number_BL_ET,ncol = length(ET_unique), nrow=length(BL_unique) )
 colnames(Basel_matrika) <- as.character(ET_unique)
 rownames(Basel_matrika) <- as.character(BL_unique)
 
@@ -123,7 +126,8 @@ par(mar=c(5, 5, 4, 5) + 0.1)
 plot(years, number_events_year, 
      ylim = c(0, max(number_events_year)), xlim = c(1984,2014), 
      xlab = '', ylab='',
-     type = "l", lty = 1, main = '')
+     type = "l", lty = 1, col=4,
+     main = '')
 
 #axis(2, ylim = c(0, max(number_events_year)), lwd = 2, col=1) 
 mtext(2, text='Stevilo skodnih dogodkov z znano bruto izgubo', line=3)
@@ -133,13 +137,14 @@ par(new=TRUE)
 plot(years, gross_losses_year,
      ylim = c(0, max(gross_losses_year)), xlim = c(1984,2014), axes = F, 
      xlab = '', ylab='',
-     type = "l", lty = 2, lwd = 2, main = '')
+     type = "l", lty = 1, ,col = 3,
+     main = '')
 
 axis(4, ylim = c(0, max(gross_losses_year) ), lwd = 1, col=1) 
 mtext(4, text='Skupa znana bruto izguba v mio GBP',line = 3)
 
 legend(x = 'topleft',legend = c('Stevilo skodnih dogodkov','Bruto izgube v mio GBP'), 
-       lty = c(3,2), border = F)
+       lty = 1, col = c(4,3))
 
 ###
 #Graf stevilo izgub skozi leta po BL
@@ -154,25 +159,47 @@ number_BL_years <- sapply(split(data$loss_corr, factor(paste(data$BL, data$years
 
 BL_years_M <- matrix(number_BL_years,ncol = length(years), nrow=length(BL_unique) )
 
-for (bl in 1: length(BL)){
+#meje za graf
+x_years <- c(1984,2014)       #xlim za leta
+y_BL <-c(0, max(BL_years_M))  #ylim do max stevila skodnih dogodkov 
+
+#graf 
+for (i in 1:length(BL_short)){
   
-  if (bl==1){
-    par(mar=c(5, 5, 4, 5) + 0.1)
-    plot(years, BL_years_M[1,] , 
-         ylim = c(0, max(BL_years_M)), xlim = c(1984,2014), 
-         xlab = '', ylab='',
-         type = "l", lty = 1, main = '', col = 1)    
-  }
+  if (i==1) par(new=F, mar=c(5, 5, 4, 5) + 0.1) else  par(new=T) 
   
-  else{
-    par(new=T)
-    plot(years, BL_years_M[bl,], 
-         ylim = c(0, max(BL_years_M)), xlim = c(1984,2014), axes = F,
+  plot(years, BL_years_M[i,], 
+         ylim = y_BL, xlim = x_years, 
+        axes = if(i==1) T else F,
          xlab = '', ylab='',
-         type = "l", lty = 1, main = '', col = bl)  
-  }
+         type = "l", lty = 1, main = '', col = 7*i)  
 }
 
+
 BL_short <-c("AS","AM", "CB", "CF", "I", "PS", "RBa", "PBr", "TS", "UBL") 
-legend(x = "topleft",legend = BL_short, col= 1: length(BL_short), lty=1 )
+legend(x = "topleft",legend = BL_short, col= 7*(1: length(BL_short)), lty=1 )
+
+####
+#skodni dogodnik po BL skozi leta
+####
+
+BL_over_years <- data.frame(loss=log((data$loss_corr/10^6), base = 10), years=data$years)
+        #matrika leto, izguba v log od  mio GBP
+
+data_loceni_BL <- split(BL_over_years, factor(as.character(data$BL))) #list izgub za vsak BL 
+
+##Priprava za risanje
+y_BL <-c(0, max(BL_over_years$loss)) #meja za y do najvecje izguve
+
+for (i in 1: length(BL_unique)){
+  years <- as.data.frame(data_loceni_BL[i])[,2]
+  log_loss <- as.data.frame(data_loceni_BL[i])[,1]
+  
+  plot(years,log_loss ,
+       xlim = x_years, ylim = y_BL,
+       main = BL_unique[i]) 
+}
+
+Basel_matrix
+
 
