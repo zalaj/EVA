@@ -108,39 +108,48 @@ number_BL_ET <- sapply(split(data$loss_corr, factor(paste(data$BL, data$ET), lev
 ###
 #Basel matrika, basel vector
 ###
-Basel_matrika <- matrix(number_BL_ET,ncol = length(ET_unique), nrow=length(BL_unique) )
+n_BL <- length(BL_short)
+n_ET <- length(ET_unique)
+n_yrs <- length(years)
+
+##Matrika
+Basel_matrika <- matrix(number_BL_ET,ncol = n_ET , nrow=n_BL )
 colnames(Basel_matrika) <- as.character(ET_unique)
 rownames(Basel_matrika) <- as.character(BL_unique)
 
+##Vektor
 Basel_vector <- rowSums(Basel_matrika)
 
 ###
 #st. skodnih dogodkov
 ###
 years <- 1984:2014
+
 number_events_year <- sapply(split(data$loss_corr, factor(paste(data$years), levels=years)), length)
 gross_losses_year <- sapply(split(data$loss_corr/10^6, factor(paste(data$years), levels=years)), sum)
 
 #Stevilo izgub
+x_years <- c(min(years) ,max(years))       #xlim za leta
+
 par(mar=c(5, 5, 4, 5) + 0.1)
 plot(years, number_events_year, 
-     ylim = c(0, max(number_events_year)), xlim = c(1984,2014), 
+     ylim = c(0, max(number_events_year)), xlim = x_years, 
      xlab = '', ylab='',
      type = "l", lty = 1, col=4,
      main = '')
 
-#axis(2, ylim = c(0, max(number_events_year)), lwd = 2, col=1) 
 mtext(2, text='Stevilo skodnih dogodkov z znano bruto izgubo', line=3)
 
 #Bruto izgube
 par(new=TRUE)
 plot(years, gross_losses_year,
-     ylim = c(0, max(gross_losses_year)), xlim = c(1984,2014), axes = F, 
+     ylim = c(0, max(gross_losses_year)), xlim = x_years, axes = F, 
      xlab = '', ylab='',
      type = "l", lty = 1, ,col = 3,
      main = '')
 
 axis(4, ylim = c(0, max(gross_losses_year) ), lwd = 1, col=1) 
+
 mtext(4, text='Skupa znana bruto izguba v mio GBP',line = 3)
 
 legend(x = 'topleft',legend = c('Stevilo skodnih dogodkov','Bruto izgube v mio GBP'), 
@@ -157,14 +166,14 @@ level_BL_years <- apply(BL_years, 1, paste, collapse=" ")     # vsi leveli - str
 number_BL_years <- sapply(split(data$loss_corr, factor(paste(data$BL, data$years), 
                                                        levels=level_BL_years)), length)
 
-BL_years_M <- matrix(number_BL_years,ncol = length(years), nrow=length(BL_unique) )
+BL_years_M <- matrix(number_BL_years,ncol = n_yrs, nrow=n_BL )
 
 #meje za graf
-x_years <- c(1984,2014)       #xlim za leta
 y_BL <-c(0, max(BL_years_M))  #ylim do max stevila skodnih dogodkov 
 
-#graf 
-for (i in 1:length(BL_short)){
+#graf
+
+for (i in 1:n_BL){
   
   if (i==1) par(new=F, mar=c(5, 5, 4, 5) + 0.1) else  par(new=T) 
   
@@ -177,7 +186,9 @@ for (i in 1:length(BL_short)){
 
 
 BL_short <-c("AS","AM", "CB", "CF", "I", "PS", "RBa", "PBr", "TS", "UBL") 
-legend(x = "topleft",legend = BL_short, col= 7*(1: length(BL_short)), lty=1 )
+
+legend(x = "topleft",legend = BL_short, col= 7*(1: n_BL), lty=1 )
+
 
 ####
 #skodni dogodnik po BL skozi leta
@@ -191,15 +202,55 @@ data_loceni_BL <- split(BL_over_years, factor(as.character(data$BL))) #list izgu
 ##Priprava za risanje
 y_BL <-c(0, max(BL_over_years$loss)) #meja za y do najvecje izguve
 
-for (i in 1: length(BL_unique)){
-  years <- as.data.frame(data_loceni_BL[i])[,2]
-  log_loss <- as.data.frame(data_loceni_BL[i])[,1]
+layout.n_BL <- matrix(1:n_BL, ncol=2, byrow=TRUE) # razporeditv polj za risanje grafa
+
+layout.n_BL <- rbind(layout.n_BL, c(n_BL+1, n_BL+2)) # dodano polje za napise na x osi
+
+layout.n_BL <- cbind(c(n_BL+3,0), layout.n_BL) # dodano polje za napise na x osi
+
+layout(layout.n_BL, widths=c(0.5,1,1), heights=rep.int(1,10)) # layout
+
+opar <- par(mar=rep.int(0,4), oma=rep.int(3,4))
+
+for (i in 1: n_BL){
+  years <- as.data.frame(data_loceni_BL[i])[,2]       #leta
+  log_loss <- as.data.frame(data_loceni_BL[i])[,1]    #izbube
   
   plot(years,log_loss ,
        xlim = x_years, ylim = y_BL,
-       main = BL_unique[i]) 
+       yaxt=if(i%%2==1) "s" else "n",
+       xaxt=if(i==9 | i==10) "s" else "n")
+  
+  text(min(x_years)+0.05*diff(x_years), min(y_BL)+0.95*diff(y_BL),
+       labels=BL_short[i], font=2)
 }
 
-Basel_matrix
+##Napisi na X osi
+plot.new()
+
+text(0.1, 0.1, labels="Year")
+
+plot.new()
+
+text(0.3,0.1, labels = "Skodni dogodki")
+points(0,0.1)
+
+###!!!!!!!! Popravi se napise na X osi in Y osi - X os je 10^4, Y os se napisi ne smejo prikirvati
+
+
+##Napisi na Y osi
+## y axis label
+plot.new()
+
+text(0.5, 0.5, srt=90,labels="TUKAJ PRIDE NAPIS NA Y OSI")
+
+
+
+
+###########################
+#2. OCENA PARAMETROV
+###########################
+
+
 
 
