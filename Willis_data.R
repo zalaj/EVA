@@ -3,6 +3,20 @@
 #data_full vsebuje 1516 podatkov o izgubah :  dim(data_full)
 #podatki so od leta 1970 do leta 2014 
 
+library(nlme)
+library(ismev)
+library(evir)
+library(base)
+library(mgcv)
+library(QRM)
+
+library(foreign)
+library(survival)
+library(epicalc)
+####
+#1. PRIPRAVA PODATKOV
+####
+
 setwd('/Users/zala/GitHub/EVA/')
 
 data_full <- read.csv('loss_data_full_view_popr.csv', sep = ';', header = TRUE,fill = TRUE )
@@ -96,6 +110,7 @@ summary(data)
 ####
 #Stevilo dogodkov za Basel matriko
 ####
+
 BL_unique <- unique(sort(data$BL))
 ET_unique <- unique(sort(data$ET))
 
@@ -108,9 +123,13 @@ number_BL_ET <- sapply(split(data$loss_corr, factor(paste(data$BL, data$ET), lev
 ###
 #Basel matrika, basel vector
 ###
+yrs <- 1984:2014
+
+BL_short <-c("AS","AM", "CB", "CF", "I", "PS", "RBa", "PBr", "TS", "UBL") 
+
 n_BL <- length(BL_short)
 n_ET <- length(ET_unique)
-n_yrs <- length(years)
+n_yrs <- length(yrs)
 
 ##Matrika
 Basel_matrika <- matrix(number_BL_ET,ncol = n_ET , nrow=n_BL )
@@ -123,17 +142,17 @@ Basel_vector <- rowSums(Basel_matrika)
 ###
 #st. skodnih dogodkov
 ###
-years <- 1984:2014
 
-number_events_year <- sapply(split(data$loss_corr, factor(paste(data$years), levels=years)), length)
-gross_losses_year <- sapply(split(data$loss_corr/10^6, factor(paste(data$years), levels=years)), sum)
+number_events_year <- sapply(split(data$loss_corr, factor(paste(data$years), levels=yrs)), length)
+gross_losses_year <- sapply(split(data$loss_corr/10^6, factor(paste(data$years), levels=yrs)), sum)
 
 #Stevilo izgub
-x_years <- c(min(years) ,max(years))       #xlim za leta
+x_yrs <- c(min(yrs) ,max(yrs))       #xlim za leta
 
-par(mar=c(5, 5, 4, 5) + 0.1)
-plot(years, number_events_year, 
-     ylim = c(0, max(number_events_year)), xlim = x_years, 
+par(mfrow=c(1,1))
+par(mar=c(5, 5, 4, 5) + 0.1, oma = rep(0,4))
+plot(yrs, number_events_year, 
+     ylim = c(0, max(number_events_year)), xlim = x_yrs, 
      xlab = '', ylab='',
      type = "l", lty = 1, col=4,
      main = '')
@@ -142,8 +161,8 @@ mtext(2, text='Stevilo skodnih dogodkov z znano bruto izgubo', line=3)
 
 #Bruto izgube
 par(new=TRUE)
-plot(years, gross_losses_year,
-     ylim = c(0, max(gross_losses_year)), xlim = x_years, axes = F, 
+plot(yrs, gross_losses_year,
+     ylim = c(0, max(gross_losses_year)), xlim = x_yrs, axes = F, 
      xlab = '', ylab='',
      type = "l", lty = 1, ,col = 3,
      main = '')
@@ -155,11 +174,11 @@ mtext(4, text='Skupa znana bruto izguba v mio GBP',line = 3)
 legend(x = 'topleft',legend = c('Stevilo skodnih dogodkov','Bruto izgube v mio GBP'), 
        lty = 1, col = c(4,3))
 
-###
+###################
 #Graf stevilo izgub skozi leta po BL
-###
+##################
 
-BL_years <- expand.grid(BL=BL_unique, years) # vse kombinacije BL-years
+BL_years <- expand.grid(BL=BL_unique, yrs) # vse kombinacije BL-years
 
 level_BL_years <- apply(BL_years, 1, paste, collapse=" ")     # vsi leveli - stringi vseh kombinacij BL-ET
 
@@ -177,17 +196,14 @@ for (i in 1:n_BL){
   
   if (i==1) par(new=F, mar=c(5, 5, 4, 5) + 0.1) else  par(new=T) 
   
-  plot(years, BL_years_M[i,], 
-         ylim = y_BL, xlim = x_years, 
+  plot(yrs, BL_years_M[i,], 
+         ylim = y_BL, xlim = x_yrs, 
         axes = if(i==1) T else F,
          xlab = '', ylab='',
          type = "l", lty = 1, main = '', col = 7*i)  
 }
 
-
-BL_short <-c("AS","AM", "CB", "CF", "I", "PS", "RBa", "PBr", "TS", "UBL") 
-
-legend(x = "topleft",legend = BL_short, col= 7*(1: n_BL), lty=1 )
+legend(x = "topleft",legend = BL_short, col= 7*(1: n_BL), lty=1)
 
 
 ####
@@ -213,15 +229,15 @@ layout(layout.n_BL, widths=c(0.5,1,1), heights=rep.int(1,10)) # layout
 opar <- par(mar=rep.int(0,4), oma=rep.int(3,4))
 
 for (i in 1: n_BL){
-  years <- as.data.frame(data_loceni_BL[i])[,2]       #leta
+  y <- as.data.frame(data_loceni_BL[i])[,2]       #leta
   log_loss <- as.data.frame(data_loceni_BL[i])[,1]    #izbube
   
-  plot(years,log_loss ,
-       xlim = x_years, ylim = y_BL,
+  plot(y,log_loss ,
+       xlim = x_yrs, ylim = y_BL,
        yaxt=if(i%%2==1) "s" else "n",
        xaxt=if(i==9 | i==10) "s" else "n")
   
-  text(min(x_years)+0.05*diff(x_years), min(y_BL)+0.95*diff(y_BL),
+  text(min(x_yrs)+0.05*diff(x_yrs), min(y_BL)+0.95*diff(y_BL),
        labels=BL_short[i], font=2)
 }
 
@@ -250,7 +266,84 @@ text(0.5, 0.5, srt=90,labels="TUKAJ PRIDE NAPIS NA Y OSI")
 ###########################
 #2. OCENA PARAMETROV
 ###########################
+#tu upostevamo samo podatke, ki so visnji od pragu u
+
+#u naj bo mediana vseh bruto izgub
+
+u <- median(data$loss_corr)
+
+data_EVA <- data[data$loss_corr>u,]
 
 
+#se prestejemo vse dogodke 
+number_events <- sapply(split(data_EVA$loss_corr, factor(paste(data_EVA$BL, data_EVA$years), 
+                                                       levels=level_BL_years)), length)
+
+nrows_lambda <-n_yrs * n_BL 
+
+num <- data.frame(years = sort(rep(yrs,n_BL)),
+               BL = rep(BL_short, n_yrs),
+               nb =number_events,
+               row.names = seq_len(nrows_lambda))
+
+##
+(lam_glm1 <- glm(nb~1, data=num, family=poisson))
+
+(lam_glm2 <- glm(nb~BL-1, data=num, family=poisson))
+
+(lam_glm3 <- glm(nb~BL+years-1, data=num, family=poisson))
+
+lrtest(lam_glm1, lam_glm2)
+lrtest(lam_glm2, lam_glm3)
+
+##v primeru, ko dodas -1 ni INTERCEPT!
+
+lam_gam1 <- gam(nb~ BL + years, data=num, family=poisson)
+summary(lam_gam1)
+
+aic <- c(AIC(lam_gam1))
+
+for (i in 2:8){
+  lam_gam <- gam(nb ~ BL + s(years, k=i+1, fx=T, bs="cr"), 
+               data=num, family=poisson)
+  
+  aic[i]<- AIC(lam_gam)
+}
+
+aic
+
+par(mfrow=c(1,1))
+plot(1:8, aic, type = 'b')
+
+a <- 0.05
+lam_gam_3 <-gam(nb ~ BL + s(years, k=3 + 1, fx=T, bs="cr"), 
+                           data=num, family=poisson)
+
+lamFit <- get.lambda.fit(lam_gam_3)
+
+lamPred <- lambda.predict(lam_gam_3 , alpha=a)
+
+#####
+
+y_lam <- c(min(lamPred$CI.low, num$nb), max(lamPred$CI.up, num$nb))
+
+layout(layout.n_BL, widths=c(0.5,1,1), heights=rep.int(1,10)) # layout
+
+par(mar=rep.int(0,4), oma=rep.int(3,4))
+
+for (i in 1: n_BL){
+  
+  group <- lamPred$covar$BL==BL_short[i]
+  
+  lambda <-  lamPred$predict[group] 
+  plot(yrs, lambda, type = 'l', xlim = x_yrs, ylim = y_lam)
+  
+  CI_up <- lamPred$CI.up[group]
+  lines(yrs, CI_up, lty=2, xlim = x_yrs, ylim = y_lam)
+  
+  CI_low <- lamPred$CI.low[group]
+  lines(yrs, CI_low, lty=2,xlim = x_yrs, ylim = y_lam)
+  
+} 
 
 
