@@ -34,15 +34,26 @@ AIC(lam_gam_1)
 AIC(lam_gam_2)
 AIC(lam_gam_3)
 
+
 #####
-(lam_fit_1 <- get.lambda.fit(lam_gam_1))
-(lam_pred_1 <- lambda.predict(lam_gam_1), alpha=a)
+# KAKO DELUJETA lambda.fit in lambda.predict
+#1. lambda.fit: get.lambda.fit da fitted values, ki so izracunane z modelom gam. Fitted values so 
+#dobljene z minimizacijo penalized loglikelihood funkcije
+#primer : unique(lam_gam_2$fitted.values) %in% lam_fit_2$fit
+
+#2. lamdba.predict
+#uporabi p<- predict(gam, se.fit=T) in za predicted values vzame f <- exp(p$fit), 
+#CI pa exp(f +/- p$se.fit * q), kjer q 1-a/2 qvantil standardne normalne porazdelitve
+#primer: unique(exp(predict(lam_gam_1, se.fit=T)$fit))==lam_pred_1$predict
+
+(lam_fit_1 <- get.lambda.fit(lam_gam_1)) #lam_gam_1$fitted.values
+(lam_pred_1 <- lambda.predict(lam_gam_1, alpha=a))
 
 (lam_fit_2 <- get.lambda.fit(lam_gam_2))
-(lam_pred_2 <- lambda.predict(lam_gam_2), alpha=a)
+(lam_pred_2 <- lambda.predict(lam_gam_2, alpha=a))
 
 (lam_fit_3 <- get.lambda.fit(lam_gam_3))
-(lam_pred_3 <- lambda.predict(lam_gam_3), alpha=a)
+(lam_pred_3 <- lambda.predict(lam_gam_3, alpha=a))
 
 
 #lambda s kubicnimi zlepki
