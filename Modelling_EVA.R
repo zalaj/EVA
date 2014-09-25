@@ -1,5 +1,5 @@
 #rm(list=ls())- izbrise vse podatke
-##Podatki Williso skodnih dogodkih 
+##Podatki skodnih dogodkih 
 #data_full vsebuje 1516 podatkov o izgubah :  dim(data_full)
 #podatki so od leta 1970 do leta 2014 
 
