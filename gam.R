@@ -1,61 +1,36 @@
 ##GAM 
 #ocena za lambda
+#uporabljeni so podatki num in datoteke Modelling_EVA.R
 
 library(nlme)
 library(mgcv)
 library(QRM)
 
-a <- 0.05
-(u <- quantile(data$loss_corr, c(0,0.1,0.2,0.3,0.4,0.5)))   #vektor kvantilov 
-
-#data_GPD so podatki v repu porazdelitve, ki so vecji od izbranega prgau u
-data_GPD <- data[data$loss_corr>u[6],]
-
-#presteti dogodke za vse kombincaije leto-BL
-number_events <- sapply(split(data_GPD$loss_corr, 
-                              factor(paste(data_GPD$BL, data_GPD$years), levels=level_BL_years)),
-                        length)
-
-nrows_lambda <- n_yrs * n_BL 
-
-num_loss <- data.frame(years = sort(rep(yrs,n_BL)),
-                  BL = rep(BL_short, n_yrs),
-                  nb =number_events,
-                  row.names = seq_len(nrows_lambda))
-
-####
-(lam_gam_1 <- gam(nb~1, data=num_loss, family=poisson))
-
-(lam_gam_2 <- gam(nb~BL-1, data=num_loss, family=poisson))
-
-(lam_gam_3 <- gam(nb~BL+years-1, data=num_loss, family=poisson))
-
-AIC(lam_gam_1)
-AIC(lam_gam_2)
-AIC(lam_gam_3)
-
 
 #####
 # KAKO DELUJETA lambda.fit in lambda.predict
+#Primer, ko samo konstanta
+(lam_gam_d <- gam(nb~1, data=num_loss, family=poisson))
+
 #1. lambda.fit: get.lambda.fit da fitted values, ki so izracunane z modelom gam. Fitted values so 
 #dobljene z minimizacijo penalized loglikelihood funkcije
-#primer : unique(lam_gam_2$fitted.values) %in% lam_fit_2$fit
+
+(lam_fit_d <- get.lambda.fit(lam_gam_d))
+unique(lam_gam_d$fitted.values)
+#unique(lam_gam_d$fitted.values) %in% lam_fit_d$fit 
 
 #2. lamdba.predict
 #uporabi p<- predict(gam, se.fit=T) in za predicted values vzame f <- exp(p$fit), 
 #CI pa exp(f +/- p$se.fit * q), kjer q 1-a/2 qvantil standardne normalne porazdelitve
+
+(lam_pred_d <- lambda.predict(lam_gam_d, alpha=a))
+
+unique(exp(predict(lam_gam_1, se.fit=T)$fit))
+
 #primer: unique(exp(predict(lam_gam_1, se.fit=T)$fit))==lam_pred_1$predict
 
-(lam_fit_1 <- get.lambda.fit(lam_gam_1)) #lam_gam_1$fitted.values
-(lam_pred_1 <- lambda.predict(lam_gam_1, alpha=a))
 
-(lam_fit_2 <- get.lambda.fit(lam_gam_2))
-(lam_pred_2 <- lambda.predict(lam_gam_2, alpha=a))
-
-(lam_fit_3 <- get.lambda.fit(lam_gam_3))
-(lam_pred_3 <- lambda.predict(lam_gam_3, alpha=a))
-
-
+#########
 #lambda s kubicnimi zlepki
 
 (lam_gam_year <- gam(nb~years-1, data=num_loss, family=poisson))
@@ -78,7 +53,7 @@ lines(lam_pred_1$covar$year, lam_pred_1$CI.low, lty=2 )
 lines(lam_pred_1$covar$year, lam_pred_1$CI.up, lty=2 )
 
 #fitted lamdba
-points(lam_pred_1$covar$year, lam_fit_1$fit)
+points(lam_fit_1$covar$year, lam_fit_1$fit)
 
 text(min(xlim)+0.05*diff(xlim), min(ylim)+0.95*diff(ylim), labels="edof = ", font=2)
 text(min(xlim)+0.15*diff(xlim), min(ylim)+0.95*diff(ylim), labels= 1, font=2)
