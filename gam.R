@@ -33,16 +33,17 @@ unique(exp(predict(lam_gam_1, se.fit=T)$fit))
 #########
 #lambda s kubicnimi zlepki
 
-(lam_gam_year <- gam(nb~years-1, data=num_loss, family=poisson))
-(lam_fit_1 <- get.lambda.fit(lam_gam_year))
-(lam_pred_1 <- lambda.predict(lam_gam_year, alpha=a))
+(lam_gam_1 <- gam(nb~years-1, data=num_loss, family=poisson))
+(lam_fit_1 <- get.lambda.fit(lam_gam_1))
+(lam_pred_1 <- lambda.predict(lam_gam_1, alpha=a))
 
 ## plot settings
 par(mfrow=c(4,2))
+par(oma=c(1,1,0,0), mar=c(1,1,1,1))
 
 xlim <- range(lam_pred_1$covar$year)
 
-ylim <- c(0, 5) 
+ylim <- c(0, max(num_loss$nb)) 
   
 #predicted lambda
 plot(lam_pred_1$covar$year, lam_pred_1$predict,type="l",
@@ -53,12 +54,14 @@ lines(lam_pred_1$covar$year, lam_pred_1$CI.low, lty=2 )
 lines(lam_pred_1$covar$year, lam_pred_1$CI.up, lty=2 )
 
 #fitted lamdba
-points(lam_fit_1$covar$year, lam_fit_1$fit)
+points(lam_fit_1$covar, lam_fit_1$fit)
+
+#data
+points(num_loss$years, num_loss$nb, col=4, pch=20)
 
 text(min(xlim)+0.05*diff(xlim), min(ylim)+0.95*diff(ylim), labels="edof = ", font=2)
 text(min(xlim)+0.15*diff(xlim), min(ylim)+0.95*diff(ylim), labels= 1, font=2)
 
-aic <- c(AIC(lam_gam_year))
 
 for (edof in 2:8){
   
@@ -83,6 +86,9 @@ for (edof in 2:8){
     
   #fitted lamdba
   points(lam_pred$covar$year, lam_fit$fit)
+  
+  #data
+  points(num_loss$years, num_loss$nb, col=4, pch=20)
   
   text(min(xlim)+0.05*diff(xlim), min(ylim)+0.95*diff(ylim), labels="edof = ", font=2)
   text(min(xlim)+0.15*diff(xlim), min(ylim)+0.95*diff(ylim), labels=edof, font=2)
