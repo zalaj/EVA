@@ -289,7 +289,11 @@ for (i in 1: n_BL){
   plot(x,log_loss ,
        xlim = x_yrs, ylim = y_BL,
        yaxt=if(i%%2==1) "s" else "n",
-       xaxt=if(i==9 | i==10) "s" else "n")
+       xaxt= "n")
+  
+  #years na x osi
+  if(i==9 | i==10) axis(1, at =seq(1980,2015,5), labels = rep('',8))
+  if(i==9 | i==10) axis(1, at =seq(1980,2010,10), labels = as.character(seq(1980,2010,10)), lwd = 1, col=1)
   
   text(min(x_yrs)+0.05*diff(x_yrs), min(y_BL)+0.95*diff(y_BL),
        labels=BL_short[i], font=2)
@@ -322,118 +326,128 @@ text(0.5, 0.5, srt=90,labels="TUKAJ PRIDE NAPIS NA Y OSI")
 ###########################
 #4. OCENA PARAMETROV
 ###########################
-#tu upostevamo samo podatke, ki so visnji od pragu u
 
+#tu upostevamo samo podatke, ki so visnji od pragu u
 u <- quantile(data$loss, c(0,0.1,0.2,0.3,0.4,0.5))   #vektor kvantilov 
 
 ###data_GPD so podatki v repu porazdelitve, ki so vecji od izbranega prgau u
-data_GPD <- data[data$loss>u[6],]
+data_GPD <- data[data$loss>u[5],]
 
-#prestejemo vse dogodke 
+
+####
+#4.1. ocena parametra lambda
+###
+
+#za oceno parametra lambda naredimo matriko stevilo dogodkov za vsak BL/years
+
 number_events <- sapply(split(data_GPD$loss, factor(paste(data_GPD$BL, data_GPD$years), 
-                                                       levels=level_BL_years)), length)
+                                                       levels=level_BL_years)), length)  #st. dogodkov
 
 nrows_lambda <-n_yrs * n_BL 
 
+#matrika num 
 num <- data.frame(years = sort(rep(yrs,n_BL)),
                BL = rep(BL_short, n_yrs),
                nb =number_events,
                row.names = seq_len(nrows_lambda))
 
-##
-(lam_glm1 <- glm(nb~1, data=num, family=poisson))
+#######
+# a) gam za lambda za vec razlicnih modelov
+##Op.: v primeru, ko dodas -1 ni INTERCEPT!
 
-(lam_gam1 <- gam(nb~1, data=num, family=poisson))
-AIC(lam_gam1)
-AIC(lam_glm1)
+(lam_gam1 <- gam(nb~1, data=num, family=poisson)) #model1: konstanta
 
-(lam_glm2 <- glm(nb~BL-1, data=num, family=poisson))
+(lam_gam2 <- gam(nb~BL-1, data=num, family=poisson)) #model2: faktorska f. za BL
 
-(lam_glm3 <- glm(nb~BL+years-1, data=num, family=poisson))
+(lam_gam3 <- gam(nb~BL+years-1, data=num, family=poisson)) #model3: linearni model faktorska f. BL + leta
 
-lrtest(lam_glm1, lam_glm2)
-lrtest(lam_glm2, lam_glm3)
+#AIC za prve 3 modele
+lam_gam1$aic
+lam_gam2$aic
+lam_gam3$aic
 
-##v primeru, ko dodas -1 ni INTERCEPT!
+#Rocno izracunan AIC za lam_gam3
+c(-2*logLik(lam_gam3) + 2*sum(lam_gam3$edf), AIC(lam_gam3))
 
-lam_gam1 <- gam(nb~ BL + years-1, data=num, family=poisson)
-summary(lam_gam1)
 
-aic <- c(AIC(lam_gam1))
+####
+#b) izbor najboljsega modela glede na AIC
+
+aic <- c(lam_gam3$aic)
+
+#model je faktorska f. BL + f. za Years z razliznimi EDOF
 
 for (i in 2:8){
-  lam_gam <- gam(nb ~ BL + s(years, k=i+1, fx=T, bs="cr")-1, fix=T,
+  lam_gam <- gam(nb ~ BL + s(years, k=i+1, fx=T, bs="cr")-1,
                data=num, family=poisson)
   
   aic[i]<- AIC(lam_gam)
 }
 
-aic
-###GRAF AIC
 
+#GRAF AIC
 par(mfrow=c(1,1))
 plot(1:8, aic, type = 'b')
 
+#najboljsi edf je najmanjsi edf, pri katerem se AIC ne zmanjsa, ce dodamo eno dodatno edof
+edf <- 3
 
 ###
-#ocena parametra lambda
-
-dof <- 3
-
+#c) ocena parametra lambda
 a <- 0.05
-lam_gam_3 <-gam(nb ~ BL + s(years, k= dof + 1,  bs="cr"), 
+
+lam_gam <-gam(nb ~ BL + s(years, k= edf + 1,  bs="cr"), 
                            data=num, family=poisson)
 
+#-2*logLik(lam_gam)+2*sum(lam_gam$edf)
+
+####
+#d) lambda: Kako delujeta funkciji get.lambda.fit() in lambda.predict je opisano v gam.R
+
+lamFit <- get.lambda.fit(lam_gam) #Fitted lamdba
+
+lamPred <- lambda.predict(lam_gam , alpha=a) #Predicted lambda
 
 
-lamFit <- get.lambda.fit(lam_gam_3)
-
-###get.lambda.fit extracts a convenient list containing unique covariate 
-    #combinations and corresponding fitted values from an object returned by gam().
-    #vrne torej enake vrednosti kot fitted - sort zato, da za fitted niso urejeni po atributih
-    #sort(get.lambda.fit(lam_gam_3)$fit)==sort(fitted(lam_gam_3))
-
-lamPred <- lambda.predict(lam_gam_3 , alpha=a)
-
-###lambda.predict() computes a convenient list containing unique covariate combinations 
-    #and corresponding predicted values and pointwise asymptotic confidence intervals 
-    #(obtained from the estimated standard errors obtained by predict(..., se.fit=TRUE)).
-
-
-#####
-#graf za lambda in intervali zaupanja
+####
+#e) graf za lambda in intervali zaupanja
 
 y_lam <- c(min(lamPred$CI.low), max(lamPred$CI.up))
-layout(layout.n_BL, widths=c(0.5,1,1), heights=rep.int(1,10)) # layout
+
+# layout
+layout(layout.n_BL, widths=c(0.5,1,1), heights=rep.int(1,10)) 
 
 par(mar=rep.int(0,4), oma=rep.int(3,4))
 
+#graf
 for (i in 1: n_BL){
   
-  group <- lamPred$covar$BL==BL_short[i]
+  #BL
+  bl <- lamPred$covar$BL==BL_short[i]
   
-  lambda <-  lamPred$predict[group] 
-  plot(yrs, lambda, type = 'b', xlim = x_yrs, ylim = y_lam,
+  lambda <-  lamPred$predict[bl]
+  
+  #predicted lambda
+  plot(yrs, lambda, type='l', xlim = x_yrs, ylim = y_lam,
        yaxt=if(i%%2==1) "s" else "n",
-       xaxt=if(i==9 | i==10) "s" else "n")
+       xaxt= "n")
   
-  CI_up <- lamPred$CI.up[group]
+  if(i==9 | i==10) axis(1, at =seq(1980,2015,5), labels = rep('',8))
+  if(i==9 | i==10) axis(1, at =seq(1980,2010,10), labels = as.character(seq(1980,2010,10)), lwd = 1, col=1)
+  
+  #CI
+  CI_up <- lamPred$CI.up[bl]
   lines(yrs, CI_up, lty=2, xlim = x_yrs, ylim = y_lam)
   
-  CI_low <- lamPred$CI.low[group]
-  lines(yrs, CI_low, lty=2,xlim = x_yrs, ylim = y_lam)
+  CI_low <- lamPred$CI.low[bl]
+  lines(yrs, CI_low, lty=2, xlim = x_yrs, ylim = y_lam)
+  
+  #fitted lambda
+  y <- lamFit$covar$years[bl]
+  fit <- lamFit$fit[bl]
+  points(yrs, lamFit$fit[bl], pch=20)
   
 } 
-
-#TEST primerjava na roke izracunanega AIC in AIC v R
-c(-2*logLik(lam_gam_3) + 2*12.18841, AIC(lam_gam_3))
-
-plot(lam_gam_3)
-gam
-
-gpd.fit(data$loss, 10^6)
-
-
 
 
 
