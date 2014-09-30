@@ -33,7 +33,7 @@ unique(exp(predict(lam_gam_1, se.fit=T)$fit))
 #########
 #lambda s kubicnimi zlepki
 
-(lam_gam_1 <- gam(nb~years-1, data=num_loss, family=poisson))
+(lam_gam_1 <- gam(nb~years-1, data=num_loss, family=poisson)) #linarno; ce bi dala s(), potem sam izbere edof
 (lam_fit_1 <- get.lambda.fit(lam_gam_1))
 (lam_pred_1 <- lambda.predict(lam_gam_1, alpha=a))
 
@@ -59,10 +59,9 @@ points(lam_fit_1$covar, lam_fit_1$fit)
 #data
 points(num_loss$years, num_loss$nb, col=4, pch=20)
 
-text(min(xlim)+0.05*diff(xlim), min(ylim)+0.95*diff(ylim), labels="edof = ", font=2)
-text(min(xlim)+0.15*diff(xlim), min(ylim)+0.95*diff(ylim), labels= 1, font=2)
-
-
+text(min(xlim)+0.05*diff(xlim), min(ylim)+0.95*diff(ylim), 
+     labels=substitute("edof="~ e., list(e.=1)), font=2)
+ 
 for (edof in 2:8){
   
   model <- gam(nb~s(years, fx=TRUE, k=edof+1, bs="cr")-1, 
@@ -90,7 +89,7 @@ for (edof in 2:8){
   #data
   points(num_loss$years, num_loss$nb, col=4, pch=20)
   
-  text(min(xlim)+0.05*diff(xlim), min(ylim)+0.95*diff(ylim), labels="edof = ", font=2)
-  text(min(xlim)+0.15*diff(xlim), min(ylim)+0.95*diff(ylim), labels=edof, font=2)
+  text(min(xlim)+0.05*diff(xlim), min(ylim)+0.95*diff(ylim), 
+       labels=substitute("edof="~ e., list(e.=edof)), font=2)
   
 }
