@@ -73,8 +73,9 @@ data_index <- merge(year_loss_1984,
 ###
 
 corrected_loss <- data_index$gross_loss*index_2014/data_index$CDKO     #popravljenje izgube za inflacijo
+loss_mio <- corrected_loss/10^6
 
-loss_corrected <- data.frame(data_index, loss = corrected_loss)   #dodan stolpec popravljenje izgube
+loss_corrected <- data.frame(data_index, loss = corrected_loss, loss_mio = loss_mio)   #dodan stolpec popravljenje izgube
 
 (loss_corrected[order(loss_corrected$loss, decreasing = TRUE),][1:10,])
 summary(loss_corrected)
@@ -180,7 +181,7 @@ Basel_matrika
 number_events_all_year<- sapply(split(data$loss, factor(paste(data$years), levels=yrs)), length)
 
 #vsota vseh izgub v mio GPD na leto
-gross_losses_year <- sapply(split(data$loss/10^6, factor(paste(data$years), levels=yrs)), sum)
+gross_losses_year <- sapply(split(data$loss_mio, factor(paste(data$years), levels=yrs)), sum)
 
 x_yrs <- range(yrs)       #xlim za leta
 
@@ -264,7 +265,7 @@ mtext(2, text='Stevilo skodnih dogodkov', line=3)
 ###
 
 #matrika leto, izguba v log od  mio GBP
-BL_over_years <- data.frame(loss=log((data$loss/10^6), base = 10), years=data$years)
+BL_over_years <- data.frame(loss=log((data$loss_mio), base = 10), years=data$years)
        
 
 data_loceni_BL <- split(BL_over_years, factor(as.character(data$BL))) #list izgub za vsak BL 
@@ -328,11 +329,13 @@ text(0.5, 0.5, srt=90,labels="TUKAJ PRIDE NAPIS NA Y OSI")
 ###########################
 
 #tu upostevamo samo podatke, ki so visnji od pragu u
-u <- quantile(data$loss, c(0,0.1,0.2,0.3,0.4,0.5))   #vektor kvantilov 
 
-###data_GPD so podatki v repu porazdelitve, ki so vecji od izbranega prgau u
-data_GPD <- data[data$loss>u[5],]
+u_kvant <- quantile(data$loss, c(0,0.1,0.2,0.3,0.4,0.5))   #vektor kvantilov 
 
+u <-as.numeric(u_kvant[5]) #treshold u
+
+###data_GPD so podatki, ki so vecji od izbranega prgau u
+data_GPD <- data[data$loss > u,]
 
 ####
 #4.1. ocena parametra lambda
@@ -429,11 +432,8 @@ for (i in 1: n_BL){
   
   #predicted lambda
   plot(yrs, lambda, type='l', xlim = x_yrs, ylim = y_lam,
-       yaxt=if(i%%2==1) "s" else "n",
+       yaxt= "n",
        xaxt= "n")
-  
-  if(i==9 | i==10) axis(1, at =seq(1980,2015,5), labels = rep('',8))
-  if(i==9 | i==10) axis(1, at =seq(1980,2010,10), labels = as.character(seq(1980,2010,10)), lwd = 1, col=1)
   
   #CI
   CI_up <- lamPred$CI.up[bl]
@@ -447,7 +447,39 @@ for (i in 1: n_BL){
   fit <- lamFit$fit[bl]
   points(yrs, lamFit$fit[bl], pch=20)
   
+  
+  #skala na x osi
+  if(i==9 | i==10) axis(1, at =seq(1980,2015,5), labels = rep('',8))
+  if(i==9 | i==10) axis(1, at =seq(1980,2010,10), labels = as.character(seq(1980,2010,10)), lwd = 1, col=1)
+  
+  #skala na y osi
+  if(i%%2==1) axis(2, at =seq(0,14,2), labels = rep('',8) )
+  if(i%%2==1) axis(2, at =seq(0,12,4), labels = as.character(seq(0,12,4)), las = 1)
+     
+  #text
+  text(min(x_yrs)+0.05*diff(x_yrs), min(y_lam)+0.90*diff(y_lam),
+       labels=BL_short[i], font=2)
+  
 } 
+
+##Napisi na X osi
+plot.new()
+
+text(0.1, 0.1, labels="Leto")
+
+plot.new()
+
+legend(0.1, 0.35, lty=c(1,2), pch=c(20,NA), bty="n", horiz=TRUE,
+       legend=c(expression(hat(lambda)),
+                substitute(a.~"CI", list(a.=1-a))),
+       text.width=strwidth("oooooooo"))
+
+## y axis label
+plot.new()
+
+text(0.1, 0.5, srt=90,
+          labels=substitute(hat(lambda)~~"z dvostranskim asimptoticnim "*a.*"% intervalom zaupanja",
+                            list(a.=1-a)))
 
 
 
@@ -455,34 +487,64 @@ for (i in 1: n_BL){
 ################################################################################################
 #ocena parametrov xi, beta
 
-B <- 32
-u_star<-u[6]
+B <- 30
 eps <- 10^(-5)
-niter <- 30
+niter <- 20
+
+#fitted value
+gpd.fit(x=sort(data_GPD$loss), threshold=u_star)
+
+#gamGPDdit ti v vsakem koraku izpise povprecno relativno razliko in ko je manjsa od eps, konca
+fit <- gamGPDfit(x=data_GPD, threshold=u, datvar="loss",
+                 xiFrhs = ~ years-1, # interaction
+                 nuFrhs = ~ years-1, # interaction
+                 eps.xi=eps, eps.nu=eps, niter=30,
+                 include.updates=T)
+
+boot <- gamGPDboot(x = data_GPD, B=B, threshold=u, datvar="loss",
+                      xiFrhs = ~years-1, # xi
+                      nuFrhs = ~years-1, # nu
+                      niter=niter, eps.xi=eps, eps.nu=eps,
+                      include.updates=T)
 
 
-bootGPD <- gamGPDboot(x=data, threshold=u_star, datvar="loss",
-                      xiFrhs = ~ BL+years, # interaction
-                      nuFrhs = ~ 1, # interaction
-                      eps.xi=eps, eps.nu=eps)
+xi_fit <- get.GPD.fit(boot, alpha = a)
+#unique(fit$xi) %in% xi_fit$xi$fit
 
-fit <- gamGPDfit(x=data, threshold=u_star, datvar="loss",
-                 xiFrhs = ~ BL+years, # interaction
-                 nuFrhs = ~ 1, # interaction
-                 eps.xi=eps, eps.nu=eps, niter=30)
+predict <- GPD.predict(boot)
 
-gamGPDboot(x=data, B=B,threshold=u_star, datvar="loss")
-QQplot(fit$res, reference='exp',rate=1)
 
-fit
--2*-11517.27 +2*-11502.59
+
+
+fit$xi.covar
+fit$xiUpdates16
+fit$MRD
+
+AIC(fit)
+
+get.GPD.fit(bootGPD)
+
+
+fit$beta
+fit$nu.covar
+bootGPD$nu.updates
 
 
 xibetaFit <- get.GPD.fit(bootGPD, alpha=a) # several s
 
 xibetaFit$xi$fit %in% fit$xi
 
+bootGPD$nuObj
 
 
 ## compute predicted values
 xibetaPred <- GPD.predict(bootGPD)
+x
+
+
+
+gamGPDboot(x=data, B=B,threshold=u_star, datvar="loss")
+QQplot(fit$res, reference='exp',rate=1)
+
+fit
+-2*-11517.27 +2*-11502.59
