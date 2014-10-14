@@ -39,16 +39,26 @@ ref <- data_1984$Ref
 org <- data_1984$Organisation
 years <- data_1984$Event.Date
 gross_loss <- data_1984$Gross.Loss.GBP
+ET <- data_1984$Basel.Loss.Event
+BL <- as.character(data_1984$Business.Line)
 
-year_loss_1984 <- data.frame(ref, org, years, gross_loss)   
+#Op.: Za vse BL, ki imajo vrednost n/a, se nastavi vrednost Unallocated Business Line
+BL[BL=='n/a']<- 'Unallocated Business Line'
+
+#Op.: Za BL Insurance(life) in Insurance (non-life) se nastavi skupni BL Insurance
+BL[BL=='Insurance(life)'] <- 'Insurance'
+BL[BL=='Insurance (non-life)'] <- 'Insurance'
+
+
+data <- data.frame(ref, org, years, gross_loss, ET=ET, BL=BL)   
 
 #odstranjeni podatki, kjer loss=NA
-year_loss_1984 <-na.omit(year_loss_1984) 
+data <-na.omit(data) 
 
 #odstranjeni se podatki, kjer loss==0, saj za analizo nimajo pomena
-year_loss_1984 <- year_loss_1984[!year_loss_1984$gross_loss==0,]
+data <- data[!data$gross_loss==0,]
 
-#dim(year_loss_1984): 968   4
+#dim(data): 968   4
 
 ###
 # 1.2. INDEKS INFLACIJE - popravljene izgube za indeks inflacije
@@ -63,39 +73,40 @@ index_2014 <- mean(as.numeric(as.vector(index_2014_monthly$CDKO))) #povprecje me
 
 index <- rbind(index[index$X>1984,], c(2014,index_2014 ))         #letni ideksi 1984-2014
 
-data_index <- merge(year_loss_1984,
-                    index, 
-                    by.x= "years",
-                    by.y= "X")        #leto, loss, inflation ideks za leto izgube
+data <- merge(data,
+              index, 
+              by.x= "years",
+              by.y= "X")        #leto, loss, inflation ideks za leto izgube
 
 ###
 # 1.3. CORRECTED_LOSS: popravljene izgube za indeks inflacije
 ###
 
-corrected_loss <- data_index$gross_loss*index_2014/data_index$CDKO     #popravljenje izgube za inflacijo
+corrected_loss <- data$gross_loss*index_2014/data$CDKO     #popravljenje izgube za inflacijo
 loss_mio <- corrected_loss/10^6
 
-loss_corrected <- data.frame(data_index, loss = corrected_loss, loss_mio = loss_mio)   #dodan stolpec popravljenje izgube
+data <- cbind(data, loss = corrected_loss, loss_mio = loss_mio)   #dodan stolpec popravljenje izgube
 
-(loss_corrected[order(loss_corrected$loss, decreasing = TRUE),][1:10,])
-summary(loss_corrected)
+(data[order(data$loss, decreasing = TRUE),][1:10,])
+summary(data)
 
-#dim(loss_corrected)
+#dim(data)
 
 ###
 # 1.4. EVENT TYPES EXPLAINED : http://www.bis.org/bcbs/qis/oprdata.pdf
 ###
 
-ET_sub <- sort(unique(data_full$Basel.Loss.Event))  #vsi ET, ki so v podatkih, urejeni od 1-7
+ET_sub <- sort(unique(data$ET))  #vsi ET, ki so v podatkih, urejeni od 1-7
 
-ET_main <- c(rep(1,3),rep(2,2), rep(3,3), rep(4,5), 5, 6, rep(7,6),2,1) #vektor 1-7, ki podkategorijam ET doloci glavne kategorije ET
+ET_main <- c(rep(1,3),rep(2,2), rep(3,2), rep(4,5), 5, 6, rep(7,7)) 
+#vektor 1-7, ki podkategorijam ET doloci glavne kategorije ET
 
-ET <- c('IF','EF', 'EPWS', 'CPBP', 'DPA', 'BDSF', 'EDPM')   #vektor s kraticami ET
+ET_kratice <- c('IF','EF', 'EPWS', 'CPBP', 'DPA', 'BDSF', 'EDPM')   #vektor s kraticami ET
 
 ET_short <- data.frame(ET.index = 1:7, ET) #povezovalna matrika med st. ET in kratico ET
 
 #koncna povezovalna matrika za vsak podtip ET kratica za glavni ET
-ET_all <- merge(data.frame(ET_sub=ET_sub[-1], ET.index = (ET_main)), ET_short,
+ET_all <- merge(data.frame(ET_sub=ET_sub, ET.index = ET_main), ET_short,
             by.x = 'ET.index', 
             by.y = 'ET.index')
 
@@ -104,14 +115,25 @@ ET_all <- merge(data.frame(ET_sub=ET_sub[-1], ET.index = (ET_main)), ET_short,
 # 1.5. BL
 ###
 
-BL <- as.character(data_1984$Business.Line)
+unique(data$BL)
 
-#Op.: Za vse BL, ki imajo vrednost n/a, se nastavi vrednost Unallocated Business Line
-BL[BL=='n/a'] <- 'Unallocated Business Line'
 
-#Op.: Za BL Insurance(life) in Insurance (non-life) se nastavi skupni BL Insurance
-BL[BL=='Insurance(life)'] <- 'Insurance'
-BL[BL=='Insurance (non-life)'] <- 'Insurance'
+
+#poslovna podrocja - Slovenski termini
+PP <- list()
+PP_vekt <- c('Agentske storitve','Uporavljanje s sredstvi', 'Komercialno bancnistvo', 
+             'Podjetnisko financiranje', 'Zavarovanje', 'Placilni Instrumenti',
+             'Poslovanje s prebivalstvom',
+             'Posredovanje pri kupoprodaji vrednostnih papirjev prebivalstva',
+             'Posli trgovanja','Nedoloceno Poslovno Podrocje')
+
+PP_kratice<- c('AS', 'US', 'KB', 'PF', 'Z', 'PI', 'PPr', 'PVP', 'PT','NPP')
+
+#BL
+BL_unique <- unique(BL)
+
+#referencna matrika
+PP_ref <- data.frame(BL = BL_unique, PP_vekt, PP=PP_kratice)
 
 
 ###
@@ -126,6 +148,12 @@ data <- merge (loss,
                by.x = 'basel_event',
                by.y = 'ET_sub')
 
+#dodana PP
+data <- merge(data, 
+              PP_ref,
+              by.x='BL',
+              by.y='BL')
+
 summary(data)
 
 ###############################
@@ -136,15 +164,13 @@ summary(data)
 # 2.1. Stevilo dogodkov za Basel matriko
 ###
 
-BL_unique <- unique(sort(data$BL))
-
 ET_unique <- unique(sort(data$ET))
 
-BL_ET <- expand.grid(BL=BL_unique, ET=ET_unique) # vse kombinacije BL-ET
+PP_ET <- expand.grid(PP=PP_kratice, ET=ET_unique) # vse kombinacije PP-ET
 
-lev <- apply(BL_ET, 1, paste, collapse=" ")     # vsi leveli - stringi vseh kombinacij BL-ET
+lev <- apply(PP_ET, 1, paste, collapse=" ")     # vsi leveli - stringi vseh kombinacij PP-ET
 
-number_BL_ET <- sapply(split(data$loss, factor(paste(data$BL, data$ET), levels=lev)), length)
+number_PP_ET <- sapply(split(data$loss, factor(paste(data$PP, data$ET), levels=lev)), length)
 
 ###
 # 2.2. Basel matrika
@@ -152,16 +178,14 @@ number_BL_ET <- sapply(split(data$loss, factor(paste(data$BL, data$ET), levels=l
 
 yrs <- 1984:2014
 
-BL_short <-c("AS","AM", "CB", "CF", "I", "PS", "RBa", "PBr", "TS", "UBL") 
-
-n_BL <- length(BL_short)
+n_PP <- length(PP_krat)
 n_ET <- length(ET_unique)
 n_yrs <- length(yrs)
 
 
-Basel_matrika <- matrix(number_BL_ET,ncol = n_ET , nrow=n_BL )
+Basel_matrika <- matrix(number_PP_ET,ncol = n_ET , nrow=n_PP )
 colnames(Basel_matrika) <- as.character(ET_unique)
-rownames(Basel_matrika) <- as.character(BL_unique)
+rownames(Basel_matrika) <- as.character(PP_kratice)
 
 Basel_matrika
 
@@ -220,75 +244,75 @@ legend(x = 'topleft',legend = c('Stevilo skodnih dogodkov','Bruto izgube v mio G
        lty = 1, col = c(4,3))
 
 ###
-#3.3. Graf stevilo izgub skozi leta po BL
+#3.3. Graf stevilo izgub skozi leta po PP
 ###
 
-BL_years <- expand.grid(BL=BL_unique, yrs) # vse kombinacije BL-years
+PP_years <- expand.grid(PP=PP_kratice, yrs) # vse kombinacije BL-years
 
-level_BL_years <- apply(BL_years, 1, paste, collapse=" ")     # vsi leveli - stringi vseh kombinacij BL-years
+level_PP_years <- apply(PP_years, 1, paste, collapse=" ")     # vsi leveli - stringi vseh kombinacij PP-years
 
-number_BL_years <- sapply(split(data$loss, factor(paste(data$BL, data$years), 
-                                                       levels=level_BL_years)), length) #st. dogodkov za vsako kombinacijo BL-years
+number_PP_years <- sapply(split(data$loss, factor(paste(data$PP, data$years), 
+                                                       levels=level_PP_years)), length) #st. dogodkov za vsako kombinacijo PP-years
 
-#Matrika st. dogodkov za vsako po BL za vsako leto
-BL_years_M <- matrix(number_BL_years,ncol = n_yrs, nrow=n_BL )
-colnames(BL_years_M) <- as.character(yrs)
-rownames(BL_years_M) <- as.character(BL_unique)
+#Matrika st. dogodkov za vsako po PP za vsako leto
+PP_years_M <- matrix(number_PP_years,ncol = n_yrs, nrow=n_PP )
+colnames(PP_years_M) <- as.character(yrs)
+rownames(PP_years_M) <- as.character(PP_kratice)
 
 #priprava za risanje
-y_BL <-c(0, max(BL_years_M))  #ylim do max stevila skodnih dogodkov 
+y_PP <-c(0, max(PP_years_M))  #ylim do max stevila skodnih dogodkov 
 col <- rainbow(10)
 
 par(mfrow=c(1,1))
 par(mar=c(5, 5, 4, 5) + 0.1, oma = rep(0,4))
 
 
-for (i in 1:n_BL){
+for (i in 1:n_PP){
   
   if (i==1) par(new=F, mar=c(5, 5, 4, 5) + 0.1) else  par(new=T) 
   
-  plot(yrs, BL_years_M[i,], 
-       ylim = y_BL, xlim = x_yrs, 
+  plot(yrs, PP_years_M[i,], 
+       ylim = y_PP, xlim = x_yrs, 
        axes = if(i==1) T else F,
        xlab = '', ylab='',
        type = "l", lty = 1, main = '', col = col[i])  
 }
 
-legend(x = "topleft",legend = BL_short, col= col, lty=1, ncol=2)
+legend(x = "topleft",legend = PP_short, col= col, lty=1, ncol=2)
 
 mtext(1, text='Leto', line=3)
 mtext(2, text='Stevilo skodnih dogodkov', line=3)
 
 
 ###
-#3.4 GRAF skodni dogodnik po BL skozi leta
+#3.4 GRAF skodni dogodnik po PP skozi leta
 ###
 
 #matrika leto, izguba v log od  mio GBP
-BL_over_years <- data.frame(loss=log((data$loss_mio), base = 10), years=data$years)
+PP_over_years <- data.frame(loss=log((data$loss_mio), base = 10), years=data$years)
        
 
-data_loceni_BL <- split(BL_over_years, factor(as.character(data$BL))) #list izgub za vsak BL 
+data_loceni_PP <- split(PP_over_years, factor(as.character(data$PP))) #list izgub za vsak PP 
 
 ##Priprava za risanje
-y_BL <-range(BL_over_years$loss) #meja za y do najvecje izguve
+y_PP <-range(PP_over_years$loss) #meja za y do najvecje izguve
 
-layout.n_BL <- matrix(1:n_BL, ncol=2, byrow=TRUE) # razporeditv polj za risanje grafa
+layout.n_PP <- matrix(1:n_PP, ncol=2, byrow=TRUE) # razporeditv polj za risanje grafa
 
-layout.n_BL <- rbind(layout.n_BL, c(n_BL+1, n_BL+2)) # dodano polje za napise na x osi
+layout.n_PP <- rbind(layout.n_PP, c(n_PP+1, n_PP+2)) # dodano polje za napise na x osi
 
-layout.n_BL <- cbind(c(n_BL+3,0), layout.n_BL) # dodano polje za napise na x osi
+layout.n_PP <- cbind(c(n_PP+3,0), layout.n_PP) # dodano polje za napise na x osi
 
-layout(layout.n_BL, widths=c(0.5,1,1), heights=rep.int(1,10)) # layout
+layout(layout.n_PP, widths=c(0.5,1,1), heights=rep.int(1,10)) # layout
 
 opar <- par(mar=rep.int(0,4), oma=rep.int(3,4))
 
-for (i in 1: n_BL){
-  x <- as.data.frame(data_loceni_BL[i])[,2]       #leta
-  log_loss <- as.data.frame(data_loceni_BL[i])[,1]    #izbube
+for (i in 1: n_PP){
+  x <- as.data.frame(data_loceni_PP[i])[,2]       #leta
+  log_loss <- as.data.frame(data_loceni_PP[i])[,1]    #izbube
   
   plot(x,log_loss ,
-       xlim = x_yrs, ylim = y_BL,
+       xlim = x_yrs, ylim = y_PP,
        yaxt=if(i%%2==1) "s" else "n",
        xaxt= "n")
   
@@ -296,8 +320,8 @@ for (i in 1: n_BL){
   if(i==9 | i==10) axis(1, at =seq(1980,2015,5), labels = rep('',8))
   if(i==9 | i==10) axis(1, at =seq(1980,2010,10), labels = as.character(seq(1980,2010,10)), lwd = 1, col=1)
   
-  text(min(x_yrs)+0.05*diff(x_yrs), min(y_BL)+0.95*diff(y_BL),
-       labels=BL_short[i], font=2)
+  text(min(x_yrs)+0.05*diff(x_yrs), min(y_PP)+0.95*diff(y_PP),
+       labels=PP_short[i], font=2)
 
 }
 
@@ -341,7 +365,7 @@ data_GPD <- data[data$loss > u,]
 #4.1. ocena parametra lambda
 ###
 
-#za oceno parametra lambda naredimo matriko stevilo dogodkov za vsak BL/years
+#za oceno parametra lambda naredimo matriko stevilo dogodkov za vsak PP/years
 
 number_events <- sapply(split(data_GPD$loss, factor(paste(data_GPD$BL, data_GPD$years), 
                                                        levels=level_BL_years)), length)  #st. dogodkov
@@ -393,7 +417,7 @@ par(mfrow=c(1,1))
 plot(1:8, aic, type = 'b')
 
 #najboljsi edf je najmanjsi edf, pri katerem se AIC ne zmanjsa, ce dodamo eno dodatno edof
-edf <- 3
+edf <- 2
 
 ###
 #c) ocena parametra lambda
@@ -485,33 +509,62 @@ text(0.1, 0.5, srt=90,
 
 ################################################################################################
 ################################################################################################
-#ocena parametrov xi, beta
+#5. ocena parametrov xi, beta
+#####
 
+#u je izbran glede na prileganje QQplota residualov v loss_severity.R
+u <- as.numeric(u_kvant[5])
+
+#modela za xi in nu sta izbrana z LR testom v datoteki loss_severity za vsak u
+
+l_severity <- loss_severity[[5]]
+
+model_xi <- formula(l_severity$xi)
+model_nu <- formula(l_severity$nu)
+
+
+a <- 0.05
 B <- 30
-eps <- 10^(-5)
+eps <- 10^(-3)
 niter <- 20
 
-#fitted value
-gpd.fit(x=sort(data_GPD$loss), threshold=u_star)
 
-#gamGPDdit ti v vsakem koraku izpise povprecno relativno razliko in ko je manjsa od eps, konca
-fit <- gamGPDfit(x=data_GPD, threshold=u, datvar="loss",
-                 xiFrhs = ~ years-1, # interaction
-                 nuFrhs = ~ years-1, # interaction
-                 eps.xi=eps, eps.nu=eps, niter=30,
+#FITTED VALUES
+#gamGPDfit ti v vsakem koraku izpise povprecno relativno razliko in ko je manjsa od eps, konca
+fit_xibeta <- gamGPDfit(x=data_GPD, threshold=u, datvar="loss",
+                 xiFrhs = model_xi, # interaction
+                 nuFrhs = model_nu, # interaction
+                 eps.xi=eps, eps.nu=eps, niter=niter,
                  include.updates=T)
 
-boot <- gamGPDboot(x = data_GPD, B=B, threshold=u, datvar="loss",
-                      xiFrhs = ~years-1, # xi
-                      nuFrhs = ~years-1, # nu
+
+
+boot_xibeta <- gamGPDboot(x = data_GPD, B=B, threshold=u, datvar="loss",
+                      xiFrhs = model_xi, # xi
+                      nuFrhs = model_nu, # nu
                       niter=niter, eps.xi=eps, eps.nu=eps,
                       include.updates=T)
 
 
-xi_fit <- get.GPD.fit(boot, alpha = a)
-#unique(fit$xi) %in% xi_fit$xi$fit
 
-predict <- GPD.predict(boot)
+fit_xibeta <- get.GPD.fit(boot_xibeta, alpha = a)
+
+pred_xibeta <- GPD.predict(boot_xibeta)
+
+xi_covar <- fit_xibeta$xi$covar
+beta_covar <- fit_xibeta$beta$covar
+
+
+
+#zacetne vrednosti
+mle_par <- fit.GPD(data=data_GPD$loss, threshold=u)$par.ests
+
+
+#predicted values
+
+sort(xibetaPred$xi$predict)
+
+#unique(fit$xi) %in% xi_fit$xi$fit
 
 
 
@@ -530,11 +583,7 @@ fit$nu.covar
 bootGPD$nu.updates
 
 
-xibetaFit <- get.GPD.fit(bootGPD, alpha=a) # several s
 
-xibetaFit$xi$fit %in% fit$xi
-
-bootGPD$nuObj
 
 
 ## compute predicted values
@@ -542,9 +591,6 @@ xibetaPred <- GPD.predict(bootGPD)
 x
 
 
-
-gamGPDboot(x=data, B=B,threshold=u_star, datvar="loss")
-QQplot(fit$res, reference='exp',rate=1)
 
 fit
 -2*-11517.27 +2*-11502.59
