@@ -103,7 +103,7 @@ ET_main <- c(rep(1,3),rep(2,2), rep(3,2), rep(4,5), 5, 6, rep(7,7))
 
 ET_kratice <- c('IF','EF', 'EPWS', 'CPBP', 'DPA', 'BDSF', 'EDPM')   #vektor s kraticami ET
 
-ET_short <- data.frame(ET.index = 1:7, ET) #povezovalna matrika med st. ET in kratico ET
+ET_short <- data.frame(ET.index = 1:7, ET_kratice) #povezovalna matrika med st. ET in kratico ET
 
 #koncna povezovalna matrika za vsak podtip ET kratica za glavni ET
 ET_all <- merge(data.frame(ET_sub=ET_sub, ET.index = ET_main), ET_short,
@@ -114,9 +114,6 @@ ET_all <- merge(data.frame(ET_sub=ET_sub, ET.index = ET_main), ET_short,
 ###
 # 1.5. BL
 ###
-
-unique(data$BL)
-
 
 
 #poslovna podrocja - Slovenski termini
@@ -130,7 +127,7 @@ PP_vekt <- c('Agentske storitve','Uporavljanje s sredstvi', 'Komercialno bancnis
 PP_kratice<- c('AS', 'US', 'KB', 'PF', 'Z', 'PI', 'PPr', 'PVP', 'PT','NPP')
 
 #BL
-BL_unique <- unique(BL)
+BL_unique <- sort(unique(data$BL))
 
 #referencna matrika
 PP_ref <- data.frame(BL = BL_unique, PP_vekt, PP=PP_kratice)
@@ -140,11 +137,11 @@ PP_ref <- data.frame(BL = BL_unique, PP_vekt, PP=PP_kratice)
 # 1.6. koncni podatki v matriki data
 ###
 
-loss <- merge (loss_corrected,
+data <- merge (data,
                data.frame(ref, basel_event = data_1984$Basel.Loss.Event, BL = BL ))
 
-data <- merge (loss,
-               ET_all,
+data <- merge (data,
+               ET_all[,c(2,3)],
                by.x = 'basel_event',
                by.y = 'ET_sub')
 
@@ -154,7 +151,7 @@ data <- merge(data,
               by.x='BL',
               by.y='BL')
 
-summary(data)
+data[,c(1,13)]
 
 ###############################
 #2. BASEL MATIRKA IN VEKTOR
@@ -164,7 +161,7 @@ summary(data)
 # 2.1. Stevilo dogodkov za Basel matriko
 ###
 
-ET_unique <- unique(sort(data$ET))
+ET_unique <- unique(sort(data$ET_kratice))
 
 PP_ET <- expand.grid(PP=PP_kratice, ET=ET_unique) # vse kombinacije PP-ET
 
@@ -178,7 +175,7 @@ number_PP_ET <- sapply(split(data$loss, factor(paste(data$PP, data$ET), levels=l
 
 yrs <- 1984:2014
 
-n_PP <- length(PP_krat)
+n_PP <- length(PP_kratice)
 n_ET <- length(ET_unique)
 n_yrs <- length(yrs)
 
@@ -199,7 +196,6 @@ Basel_matrika
 ####################################
 #3. GRAFI ZA VSE SKODNE DOGODKE
 ####################################
-
 
 #stevilo dogodkov po letih
 number_events_all_year<- sapply(split(data$loss, factor(paste(data$years), levels=yrs)), length)
@@ -278,7 +274,7 @@ for (i in 1:n_PP){
        type = "l", lty = 1, main = '', col = col[i])  
 }
 
-legend(x = "topleft",legend = PP_short, col= col, lty=1, ncol=2)
+legend(x = "topleft",legend = PP_kratice, col= col, lty=1, ncol=2)
 
 mtext(1, text='Leto', line=3)
 mtext(2, text='Stevilo skodnih dogodkov', line=3)
@@ -292,7 +288,7 @@ mtext(2, text='Stevilo skodnih dogodkov', line=3)
 PP_over_years <- data.frame(loss=log((data$loss_mio), base = 10), years=data$years)
        
 
-data_loceni_PP <- split(PP_over_years, factor(as.character(data$PP))) #list izgub za vsak PP 
+data_loceni_PP <- split(PP_over_years, factor(as.character(sort(data$PP)))) #list izgub za vsak PP 
 
 ##Priprava za risanje
 y_PP <-range(PP_over_years$loss) #meja za y do najvecje izguve
@@ -308,6 +304,8 @@ layout(layout.n_PP, widths=c(0.5,1,1), heights=rep.int(1,10)) # layout
 opar <- par(mar=rep.int(0,4), oma=rep.int(3,4))
 
 for (i in 1: n_PP){
+  pp <- as.character(sort(PP_kratice)[i])
+  
   x <- as.data.frame(data_loceni_PP[i])[,2]       #leta
   log_loss <- as.data.frame(data_loceni_PP[i])[,1]    #izbube
   
@@ -315,13 +313,14 @@ for (i in 1: n_PP){
        xlim = x_yrs, ylim = y_PP,
        yaxt=if(i%%2==1) "s" else "n",
        xaxt= "n")
+  abline(h = log(u/10^6, base=10), lty=2)
   
   #years na x osi
   if(i==9 | i==10) axis(1, at =seq(1980,2015,5), labels = rep('',8))
   if(i==9 | i==10) axis(1, at =seq(1980,2010,10), labels = as.character(seq(1980,2010,10)), lwd = 1, col=1)
   
   text(min(x_yrs)+0.05*diff(x_yrs), min(y_PP)+0.95*diff(y_PP),
-       labels=PP_short[i], font=2)
+       labels=pp, font=2)
 
 }
 
@@ -329,12 +328,12 @@ for (i in 1: n_PP){
 ##Napisi na X osi
 plot.new()
 
-text(0.1, 0.1, labels="Year")
+text(0.1, 0.1, labels="Leto")
 
 plot.new()
 
-text(0.3,0.1, labels = "Skodni dogodki")
-points(0,0.1)
+legend(0.0, 0.35, lty=c(NA,2), pch=c(1, NA), bty="n", horiz=TRUE,
+       legend=c('Skodni dogodki', 'Prag' ))
 
 ## y axis label
 plot.new()
@@ -346,15 +345,12 @@ text(0.5, 0.5, srt=90,labels="TUKAJ PRIDE NAPIS NA Y OSI")
 
 
 
-
-
 ###########################
 #4. OCENA PARAMETROV
 ###########################
 
 #tu upostevamo samo podatke, ki so visnji od pragu u
-
-u_kvant <- quantile(data$loss, c(0,0.1,0.2,0.3,0.4,0.5))   #vektor kvantilov 
+  #vektor kvantilov 
 
 u <-as.numeric(u_kvant[5]) #treshold u
 
@@ -367,14 +363,14 @@ data_GPD <- data[data$loss > u,]
 
 #za oceno parametra lambda naredimo matriko stevilo dogodkov za vsak PP/years
 
-number_events <- sapply(split(data_GPD$loss, factor(paste(data_GPD$BL, data_GPD$years), 
-                                                       levels=level_BL_years)), length)  #st. dogodkov
+number_events <- sapply(split(data_GPD$loss, factor(paste(data_GPD$PP, data_GPD$years), 
+                                                       levels=level_PP_years)), length)  #st. dogodkov
 
-nrows_lambda <-n_yrs * n_BL 
+nrows_lambda <-n_yrs * n_PP 
 
 #matrika num 
-num <- data.frame(years = sort(rep(yrs,n_BL)),
-               BL = rep(BL_short, n_yrs),
+num <- data.frame(years = sort(rep(yrs,n_PP)),
+               PP = rep(PP_kratice, n_yrs),
                nb =number_events,
                row.names = seq_len(nrows_lambda))
 
@@ -384,9 +380,9 @@ num <- data.frame(years = sort(rep(yrs,n_BL)),
 
 (lam_gam1 <- gam(nb~1, data=num, family=poisson)) #model1: konstanta
 
-(lam_gam2 <- gam(nb~BL-1, data=num, family=poisson)) #model2: faktorska f. za BL
+(lam_gam2 <- gam(nb~PP-1, data=num, family=poisson)) #model2: faktorska f. za PP
 
-(lam_gam3 <- gam(nb~BL+years-1, data=num, family=poisson)) #model3: linearni model faktorska f. BL + leta
+(lam_gam3 <- gam(nb~PP+years-1, data=num, family=poisson)) #model3: linearni model faktorska f. PP + leta
 
 #AIC za prve 3 modele
 lam_gam1$aic
@@ -396,16 +392,19 @@ lam_gam3$aic
 #Rocno izracunan AIC za lam_gam3
 c(-2*logLik(lam_gam3) + 2*sum(lam_gam3$edf), AIC(lam_gam3))
 
+#LR_Test
+lr_21 <- lr_test(logLik(lam_gam1), logLik(lam_gam2), 9,0.05)
+lr_32 <- lr_test(logLik(lam_gam2), logLik(lam_gam3), 1,0.05)
 
 ####
 #b) izbor najboljsega modela glede na AIC
 
 aic <- c(lam_gam3$aic)
 
-#model je faktorska f. BL + f. za Years z razliznimi EDOF
+#model je faktorska f. PP + f. za Years z razliznimi EDOF
 
 for (i in 2:8){
-  lam_gam <- gam(nb ~ BL + s(years, k=i+1, fx=T, bs="cr")-1,
+  lam_gam <- gam(nb ~ PP + s(years, k=i+1, fx=T, bs="cr")-1,
                data=num, family=poisson)
   
   aic[i]<- AIC(lam_gam)
@@ -417,13 +416,13 @@ par(mfrow=c(1,1))
 plot(1:8, aic, type = 'b')
 
 #najboljsi edf je najmanjsi edf, pri katerem se AIC ne zmanjsa, ce dodamo eno dodatno edof
-edf <- 2
+edf <- 3
 
 ###
 #c) ocena parametra lambda
 a <- 0.05
 
-lam_gam <-gam(nb ~ BL + s(years, k= edf + 1,  bs="cr"), 
+lam_gam <-gam(nb ~ PP + s(years, k= edf + 1,  bs="cr"), 
                            data=num, family=poisson)
 
 #-2*logLik(lam_gam)+2*sum(lam_gam$edf)
@@ -442,17 +441,18 @@ lamPred <- lambda.predict(lam_gam , alpha=a) #Predicted lambda
 y_lam <- c(min(lamPred$CI.low), max(lamPred$CI.up))
 
 # layout
-layout(layout.n_BL, widths=c(0.5,1,1), heights=rep.int(1,10)) 
+layout(layout.n_PP, widths=c(0.5,1,1), heights=rep.int(1,10)) 
 
 par(mar=rep.int(0,4), oma=rep.int(3,4))
 
 #graf
-for (i in 1: n_BL){
+for (i in 1: n_PP){
   
-  #BL
-  bl <- lamPred$covar$BL==BL_short[i]
+  #
+  pp.<- sort(PP_kratice)[i]
+  pp <- lamPred$covar$PP==pp.
   
-  lambda <-  lamPred$predict[bl]
+  lambda <-  lamPred$predict[pp]
   
   #predicted lambda
   plot(yrs, lambda, type='l', xlim = x_yrs, ylim = y_lam,
@@ -460,16 +460,16 @@ for (i in 1: n_BL){
        xaxt= "n")
   
   #CI
-  CI_up <- lamPred$CI.up[bl]
+  CI_up <- lamPred$CI.up[pp]
   lines(yrs, CI_up, lty=2, xlim = x_yrs, ylim = y_lam)
   
-  CI_low <- lamPred$CI.low[bl]
+  CI_low <- lamPred$CI.low[pp]
   lines(yrs, CI_low, lty=2, xlim = x_yrs, ylim = y_lam)
   
   #fitted lambda
-  y <- lamFit$covar$years[bl]
-  fit <- lamFit$fit[bl]
-  points(yrs, lamFit$fit[bl], pch=20)
+  y <- lamFit$covar$years[pp]
+  fit <- lamFit$fit[pp]
+  points(yrs, lamFit$fit[pp], pch=20)
   
   
   #skala na x osi
@@ -482,7 +482,7 @@ for (i in 1: n_BL){
      
   #text
   text(min(x_yrs)+0.05*diff(x_yrs), min(y_lam)+0.90*diff(y_lam),
-       labels=BL_short[i], font=2)
+       labels=pp., font=2)
   
 } 
 
@@ -531,14 +531,14 @@ niter <- 20
 
 #FITTED VALUES
 #gamGPDfit ti v vsakem koraku izpise povprecno relativno razliko in ko je manjsa od eps, konca
-fit_xibeta <- gamGPDfit(x=data_GPD, threshold=u, datvar="loss",
+fit_xibeta_all <- gamGPDfit(x=data_GPD, threshold=u, datvar="loss",
                  xiFrhs = model_xi, # interaction
                  nuFrhs = model_nu, # interaction
                  eps.xi=eps, eps.nu=eps, niter=niter,
                  include.updates=T)
 
 
-
+#BOOTSTRAPPED CI
 boot_xibeta <- gamGPDboot(x = data_GPD, B=B, threshold=u, datvar="loss",
                       xiFrhs = model_xi, # xi
                       nuFrhs = model_nu, # nu
@@ -546,13 +546,15 @@ boot_xibeta <- gamGPDboot(x = data_GPD, B=B, threshold=u, datvar="loss",
                       include.updates=T)
 
 
-
+#fitted values urejene po atributih
 fit_xibeta <- get.GPD.fit(boot_xibeta, alpha = a)
 
+#predicted values
 pred_xibeta <- GPD.predict(boot_xibeta)
 
-xi_covar <- fit_xibeta$xi$covar
-beta_covar <- fit_xibeta$beta$covar
+#atributi za xi in beta
+xi_atr <- fit_xibeta$xi$covar
+beta_atr <- fit_xibeta$beta$covar
 
 
 
