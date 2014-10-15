@@ -10,6 +10,7 @@ library(QRM)
 #####
 # KAKO DELUJETA lambda.fit in lambda.predict
 #Primer, ko samo konstanta
+a <- 0.05
 (lam_gam_d <- gam(nb~1, data=num_loss, family=poisson))
 
 #1. lambda.fit: get.lambda.fit da fitted values, ki so izracunane z modelom gam. Fitted values so 
