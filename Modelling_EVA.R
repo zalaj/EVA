@@ -556,6 +556,57 @@ pred_xibeta <- GPD.predict(boot_xibeta)
 xi_atr <- fit_xibeta$xi$covar
 beta_atr <- fit_xibeta$beta$covar
 
+#######
+#graf za xi
+## layout
+
+layout.mat <- matrix(1:1, ncol=1, byrow=TRUE) # plot matrix layout
+
+layout.mat <- rbind(layout.mat, 2) # add plot regions for x axis label
+
+layout.mat <- cbind(c(3, 0), layout.mat) # add plot regions for y axis label
+
+layout(layout.mat, widths=c(0.2, 1, 1), heights=c(1, 0.2)) # layout
+
+par(mar=rep.int(0,4), oma=rep.int(3,4))
+
+#fitted xi
+xifit <- fit_xibeta$xi$fit
+
+#CI za xi
+xi_ci_low <- fit_xibeta$xi$CI.low
+xi_ci_up <- fit_xibeta$xi$CI.up
+
+
+
+y_xi <- c(min(xi_ci_low), max(xi_ci_up))
+
+plot (1:10 ,xifit,  type='p', pch=19,
+      ylim = y_xi, ylab='',
+      xaxt= "n", xlab= 'Poslovna podrocja')
+axis(1, at = 1:10, labels =xi_atr$PP)
+
+#CI za 
+r <- 0.2 #dolzina crtice pri spodnji iz zgornji meji
+
+for(i in 1:10) {
+  lines(c(i, i), c(xi_ci_low[i], xi_ci_up[i]), lty=2)       # veritkalna crta
+  lines(c(i-r, i+r), c(xi_ci_low[i], xi_ci_low[i]))  # spodnja meja
+  lines(c(i-r, i+r), c(xi_ci_up[i], xi_ci_up[i])) #zgornja meja
+}
+
+plot.new()
+text(0.5, 0.1,
+     labels='Poslovna podrocja')
+
+plot.new()
+text(0.1, 0.5, srt=90,
+     labels=substitute(hat(xi)~~"z dvostranskim bootstrap "*a.*"% int. zaupanja",
+                       list(a.=1-a)))
+
+
+
+
 
 
 #zacetne vrednosti
