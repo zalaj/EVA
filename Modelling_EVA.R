@@ -281,7 +281,7 @@ mtext(2, text='Stevilo skodnih dogodkov', line=3)
 
 
 ###
-#3.4 GRAF skodni dogodnik po PP skozi leta
+#3.4 GRAF log skodnih dogodkov po PP skozi leta
 ###
 
 #matrika leto, izguba v log od  mio GBP
@@ -552,11 +552,10 @@ fit_xibeta <- get.GPD.fit(boot_xibeta, alpha = a)
 #predicted values
 pred_xibeta <- GPD.predict(boot_xibeta)
 
-#atributi za xi in beta
+#atributi za xi
 xi_atr <- fit_xibeta$xi$covar
-beta_atr <- fit_xibeta$beta$covar
 
-#######
+###############
 #graf za xi
 ## layout
 
@@ -587,7 +586,7 @@ plot (1:10 ,xifit,  type='p', pch=19,
 axis(1, at = 1:10, labels =xi_atr$PP)
 
 #CI za 
-r <- 0.2 #dolzina crtice pri spodnji iz zgornji meji
+r <- 0.3 #dolzina crtice pri spodnji iz zgornji meji
 
 for(i in 1:10) {
   lines(c(i, i), c(xi_ci_low[i], xi_ci_up[i]), lty=2)       # veritkalna crta
@@ -606,6 +605,68 @@ text(0.1, 0.5, srt=90,
 
 
 
+
+##########################################################
+# GRAF ZA BETA
+
+##Priprava za risanje
+
+layout.n_PP <- matrix(1:n_PP, ncol=2, byrow=TRUE) # razporeditv polj za risanje grafa
+layout.n_PP <- rbind(layout.n_PP, c(n_PP+1, n_PP+2)) # dodano polje za napise na x osi
+layout.n_PP <- cbind(c(n_PP+3,0), layout.n_PP) # dodano polje za napise na x osi
+layout(layout.n_PP, widths=c(0.5,1,1), heights=rep.int(1,10)) # layout
+
+opar <- par(mar=rep.int(0,4), oma=rep.int(3,4))
+
+x_beta <- range(yrs)
+y_beta <- c(min(log(fit_xibeta$beta$CI.low, base = 10)), max(log(fit_xibeta$beta$CI.up, base = 10)))
+
+#atributi za beta
+beta_atr <- fit_xibeta$beta$covar 
+
+
+for (i in 1: n_PP){
+  pp <- PP_kratice[i]
+  
+  #vektor, ki izloci samo vrednosti za to PP
+  b_pred <- pred_xibeta$beta$covar$PP == pp
+  b_fit <- fit_xibeta$beta$covar$PP == pp
+
+  y_pred <- pred_xibeta$beta$covar$years[b_pred]
+  beta_pred <- log(pred_xibeta$beta$predict[b_pred], base= 10)
+  
+  y_fit <- fit_xibeta$beta$covar$years[b_fit]
+  beta_fit <- log(fit_xibeta$beta$fit[b_fit], base = 10)
+  
+  beta_ci_low <- log(fit_xibeta$beta$CI.low[b_fit], base = 10)
+  beta_ci_up <- log(fit_xibeta$beta$CI.up[b_fit], base = 10)
+  
+  
+  #predvidene vrednosti
+  plot(y_pred, beta_pred, type = 'l', pch= 20, xlim = x_beta, ylim = y_beta,
+       yaxt=if(i%%2==1) "s" else "n", xaxt= "n")
+  
+  #fitted vrednosti
+  points(y_fit, beta_fit, pch=20)
+  
+  #CI
+  r <- 0.3 #dolzina crtice pri spodnji iz zgornji meji
+  
+  for(j in 1:length(y_fit)) {
+    lines(c(y_fit[j], y_fit[j]), c(beta_ci_low[j], beta_ci_up[j]), lty=2)       # veritkalna crta
+    lines(c(y_fit[j]-r, y_fit[j]+r), c(beta_ci_low[j], beta_ci_low[j]))  # spodnja meja
+    lines(c(y_fit[j]-r, y_fit[j]+r), c(beta_ci_up[j], beta_ci_up[j])) #zgornja meja
+  } 
+   
+  #years na x osi
+  if(i==9 | i==10) axis(1, at =seq(1980,2015,5), labels = rep('',8))
+  if(i==9 | i==10) axis(1, at =seq(1980,2010,10), labels = as.character(seq(1980,2010,10)), lwd = 1, col=1)
+  
+  #PP
+  text(min(x_yrs)+0.05*diff(x_yrs), min(y_beta)+0.95*diff(y_beta),
+       labels=pp, font=2)
+  
+}
 
 
 
