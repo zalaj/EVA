@@ -1,3 +1,8 @@
+a <- 0.05
+B <- 30
+eps <- 10^(-3)
+niter <- 128
+
 ####
 #LRtest
 
@@ -5,7 +10,7 @@ lr_test <- function(logl0, logl1, df, a){
   #H_0 : model M_0 je pravi, H_1: model M_1 je pravi
   #LogLR test izracuna D = 2* (l(M_1) - l(M_0)). H_0 zavrnemo, 
   
-  D <- 2*(logl1 - logl0)
+  D <- (2*(logl1 - logl0))
   c <-  qchisq(1-a, df)
   
   p <- pchisq(D, df, lower.tail=F)
@@ -16,7 +21,6 @@ lr_test <- function(logl0, logl1, df, a){
   if(D<c) return(paste('Ne zavrnemo H0. P-vrednost je:',round(p,digit=4), 'D=',D,"c=", c))
   else return(paste('Zavrnemo H0. P-vrednost je:',round(p,digit=4), "D=", D,"c=", c))
 }
-
 
 #
 #Model selection
@@ -38,7 +42,7 @@ model_xi_nu <- function(u){
     #gamGPDdit ti v vsakem koraku izpise povprecno relativno razliko in ko je manjsa od eps, konca
     fit_1 <- gamGPDfit(x=data_GPD, threshold=u, datvar="loss",
                      xiFrhs = formula(f_xi[i]), 
-                     nuFrhs = ~ PP-1, 
+                     nuFrhs = ~ 1, 
                      eps.xi=eps, eps.nu=eps, niter=niter, progress = F)
 
       
@@ -66,7 +70,7 @@ model_xi_nu <- function(u){
       
     #########
     #model za nu
-    f_nu <- c('~1','~PP - 1', '~PP + years - 1', "~PP + s(years, bs='cr') - 1")
+    f_nu <- c('~1','~PP-1 ', '~PP + years - 1', "~PP + s(years, bs='cr') - 1")
       
     glm_nu <- numeric(0)
     edf_nu <- numeric(0)
@@ -77,7 +81,7 @@ model_xi_nu <- function(u){
       fit_2 <- gamGPDfit(x=data_GPD, threshold=u, datvar="loss",
                        xiFrhs = formula(model_xi), # interaction
                        nuFrhs = formula(f_nu[j]), # interactin
-                       eps.xi=eps, eps.nu=eps, niter=30, progress = F)
+                       eps.xi=eps, eps.nu=eps, niter=niter, progress = F)
     
         
       glm_nu[j]<- fit_2$logL
@@ -110,6 +114,7 @@ model_xi_nu <- function(u){
 
 
 #dolocitev ustreznih modelov za vsako vrednost u
+
 loss_severity <- list()
 for (i in 1:6){
   
@@ -123,13 +128,28 @@ for (i in 1:6){
 }
 
 
+
+###*************
+#QQ_plot
+###*************
+QQ_plot_exp <- function(x,a=0.5){
+  
+  n <- length(x)
+  plot.points <- ppoints(n, a)
+  xp <- qexp(plot.points)
+  y <- sort(x)
+  plot(xp, y, xlab ="Teoreti\u010Dni kvantili", ylab = "Residuali", xlim = c(0,8), ylim = c(0,7))
+  
+  #premica
+  y_p <- qexp(ppoints(x))
+  abline(lsfit(y_p, sort(x)), col= 4  )
+  
+}
+
 ###
 #QQ plot residualov glede na izbrane formule za xi in nu
-qq_res <- function(model_xi, model_nu, u, k){
-  
+qq_res <- function(model_xi, model_nu, u, k){ 
   #priprava za risanje
-  par(mar=c(5, 5, 4, 5) + 0.1, oma = rep(0,4))
-
   
   #podatki v odvisnosti od 
   data_GPD <- data[data$loss > u,]
@@ -141,27 +161,21 @@ qq_res <- function(model_xi, model_nu, u, k){
                    eps.xi=eps, eps.nu=eps, niter=30, progress = F)$res
   
   #QQplot x=qexp, y=sort(res)
-  QQplot(res, reference = "exp")
-  
-  #premica
-  y <- qexp(ppoints(res))
-  abline(lsfit(y, sort(res)), col= 2)
-  
+  QQ_plot_exp(res)
+ 
   #napisi
-  kvantil <- paste(k, '% kvantil')
-  text(1, 5, labels = kvantil)
-  text(1, 4.5, labels = substitute("u=" ~u., list (u.=u)), font=2 )
+  if (k == 0) kvant<- "0"
+  else kvant <- paste("0,",k, sep='')
   
-  #x<- ppoints(length(res))
-  #qqline_x<- qexp(x)
-  #lines(qqline_x,qqline_x)
-  
+  kvantil <- paste(kvant, '- kvantil')
+  text(1, 6, labels = kvantil)
+  #text(1, 4.5, labels = substitute("u=" ~u., list (u.=u)), font=2 )
 }
 
 #qqplot za vsako vrednost u in za izbrane modele
-par(mfrow=c(1,1))
+par(mfrow=c(2,3))
+par(mar=c(5, 5, 2, 2) + 0.1, oma = rep(0,4))
 for (i in 1:6){
-  
   u <- as.numeric(u_kvant[i])
   
   l <- loss_severity[[i]]
@@ -172,7 +186,6 @@ for (i in 1:6){
   qq_res(model_xi, model_nu,u, (i-1)*10)
   
 }
-
 
 
 #residuali
@@ -188,4 +201,22 @@ resi <- mapply(function(data_GPD$loss, 0.888, 5) if (!is.na(beta))
 sum(-log(fit$beta)- (1+1/fit$xi)*log(1+fit$xi*fit$y/fit$beta))
 sum(log(1+fit$xi)-fit$nu-(1+1/fit$xi)*log(1+ fit$xi*(1+fit$xi)*exp(-fit$nu)*fit$y))  
 glm_xi  
+
+#st. preseganj
+for (i in 1:6){
+  u <- as.numeric(u_kvant[i])
+  print(length(data[data$loss>u,]$loss))
+}
+
+
+u. <- as.numeric(u_kvant[6])
+data_GPD. <- data_GPD[data_GPD$loss>u.,]
+
+g <- gamGPDfit(x=data_GPD., threshold=u., datvar="loss",
+          xiFrhs =~PP-1, # interaction
+          nuFrhs = ~PP+years-1, # interaction
+          eps.xi=10^(-3), eps.nu=10^(-3), niter=niter,
+          include.updates=F)
+
+
   
