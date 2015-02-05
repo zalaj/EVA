@@ -2,5 +2,4 @@ Modeliranje operativnega tveganja z atributi
 
 EVA
 ===
-
-EVA method with covariates
+Operational Risk modeling using Dynamic Extreme value theory depending on covariates.
